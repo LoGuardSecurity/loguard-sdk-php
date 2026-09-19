@@ -12,9 +12,7 @@ final class SigningTest extends TestCase
     public function testSignatureIsHmacSha256OfTimestampDotBody(): void
     {
         $body = Signing::buildBody(['events' => [['type' => 'http_request']]]);
-        [$sentBody, $headers] = Signing::sign('super-secret-key', $body);
-
-        $this->assertSame($body, $sentBody, 'must sign exactly the bytes that get sent');
+        $headers = Signing::sign('super-secret-key', $body);
 
         $timestamp = $headers['X-LoGuard-Timestamp'];
         $expected = 'sha256=' . hash_hmac('sha256', $timestamp . '.' . $body, 'super-secret-key');
@@ -23,7 +21,7 @@ final class SigningTest extends TestCase
 
     public function testHeadersIncludeRequiredFields(): void
     {
-        [, $headers] = Signing::sign('k', Signing::buildBody(['a' => 1]));
+        $headers = Signing::sign('k', Signing::buildBody(['a' => 1]));
 
         $this->assertArrayHasKey('X-Api-Key', $headers);
         $this->assertArrayHasKey('X-LoGuard-Timestamp', $headers);
@@ -36,8 +34,8 @@ final class SigningTest extends TestCase
     public function testEachSignatureUsesAFreshRequestId(): void
     {
         $body = Signing::buildBody(['a' => 1]);
-        [, $h1] = Signing::sign('k', $body);
-        [, $h2] = Signing::sign('k', $body);
+        $h1 = Signing::sign('k', $body);
+        $h2 = Signing::sign('k', $body);
 
         $this->assertNotSame($h1['X-Request-ID'], $h2['X-Request-ID']);
     }
