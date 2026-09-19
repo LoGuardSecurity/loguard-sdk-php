@@ -85,8 +85,6 @@ final class Client
         $this->onDropped = $callback;
     }
 
-    // ── Ingest: sync ─────────────────────────────────────────────────
-
     /**
      * Track a single security event. Blocking — waits for the LoGuard
      * API response (bounded by config timeout * retries).
@@ -148,7 +146,7 @@ final class Client
     ): void {
         try {
             $event = $this->buildEvent($type, $ip, $path, $statusCode, $userId, $service, $meta, $ts);
-        } catch (LoGuardException $e) {
+        } catch (LoGuardException) {
             return;
         }
 
@@ -174,7 +172,7 @@ final class Client
             $batch = array_splice($this->pending, 0, $this->maxBatchSize);
             try {
                 $this->sendEventsSync($batch);
-            } catch (LoGuardException $e) {
+            } catch (LoGuardException) {
                 // Best-effort delivery: drop this batch and keep going,
                 // never let a transport failure surface from flush().
                 continue;
@@ -195,13 +193,6 @@ final class Client
         $this->flush();
     }
 
-    public function isInitialized(): bool
-    {
-        return true;
-    }
-
-    // ── Internal ─────────────────────────────────────────────────────
-
     private function registerShutdownFlush(): void
     {
         if ($this->shutdownRegistered) {
@@ -214,6 +205,10 @@ final class Client
     }
 
     /**
+     * Keys match the wire format exactly (snake_case) — the same shape
+     * eventBatch()'s caller writes and Event::jsonSerialize() produces,
+     * so a batch built from decoded JSON round-trips without translation.
+     *
      * @param array<string, mixed> $e
      */
     private function buildEventFromArray(array $e): Event
@@ -222,8 +217,8 @@ final class Client
             (string) ($e['type'] ?? ''),
             (string) ($e['ip'] ?? ''),
             (string) ($e['path'] ?? ''),
-            (int) ($e['status_code'] ?? $e['statusCode'] ?? 0),
-            isset($e['user_id']) ? (string) $e['user_id'] : ($e['userId'] ?? null),
+            (int) ($e['status_code'] ?? 0),
+            isset($e['user_id']) ? (string) $e['user_id'] : null,
             isset($e['service']) ? (string) $e['service'] : null,
             (array) ($e['meta'] ?? []),
             $e['ts'] ?? null

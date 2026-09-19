@@ -18,17 +18,17 @@ use LoGuard\Sdk\Exceptions\LoGuardValidationException;
  */
 final class Config
 {
-    public string $apiKey;
-    public string $baseUrl;
-    public string $env;
-    public float $timeout;
-    public int $retries;
-    public ?string $service;
-    public bool $allowInsecureTransport;
-
     public const DEFAULT_BASE_URL = 'https://loguard.org';
     public const DEFAULT_TIMEOUT = 10.0;
     public const DEFAULT_RETRIES = 3;
+
+    public readonly string $apiKey;
+    public readonly string $baseUrl;
+    public readonly string $env;
+    public readonly float $timeout;
+    public readonly int $retries;
+    public readonly ?string $service;
+    public readonly bool $allowInsecureTransport;
 
     public function __construct(
         string $apiKey,
@@ -60,15 +60,33 @@ final class Config
             );
         }
 
-        $service = $service ?? getenv('OTEL_SERVICE_NAME') ?: (getenv('SERVICE_NAME') ?: null);
-
         $this->apiKey = trim($apiKey);
         $this->baseUrl = $baseUrl;
         $this->env = $env !== '' ? $env : 'production';
         $this->timeout = $timeout;
         $this->retries = max(1, $retries);
-        $this->service = $service !== false && $service !== null && $service !== '' ? $service : null;
+        $this->service = self::resolveService($service);
         $this->allowInsecureTransport = $allowInsecureTransport;
+    }
+
+    /**
+     * Falls back to whatever OpenTelemetry env var conventions the
+     * deployment already uses, so a service name only has to be set
+     * once in infra (not once per call site) if the caller doesn't
+     * pass one explicitly.
+     */
+    private static function resolveService(?string $explicit): ?string
+    {
+        if ($explicit !== null && $explicit !== '') {
+            return $explicit;
+        }
+
+        $fromEnv = getenv('OTEL_SERVICE_NAME');
+        if ($fromEnv === false || $fromEnv === '') {
+            $fromEnv = getenv('SERVICE_NAME');
+        }
+
+        return $fromEnv !== false && $fromEnv !== '' ? $fromEnv : null;
     }
 
     /**

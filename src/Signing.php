@@ -7,10 +7,9 @@ namespace LoGuard\Sdk;
 /**
  * Request signing for the LoGuard PHP SDK.
  *
- * Byte-for-byte the same protocol as the Python/Node/Go/C# SDKs
- * (see loguard/_signing.py, src/signing.js, loguard/signing.go,
- * Signing.cs): HMAC-SHA256 over "{unix_timestamp}." + body_bytes,
- * keyed with the raw API key. The server verifies:
+ * Same protocol as every other LoGuard SDK: HMAC-SHA256 over
+ * "{unix_timestamp}." + body_bytes, keyed with the raw API key. The
+ * server verifies:
  *
  *   1. X-LoGuard-Timestamp is fresh (< 5 minutes old) — replay protection.
  *   2. X-LoGuard-Signature matches HMAC-SHA256(api_key, "{ts}." + body).
@@ -31,18 +30,17 @@ final class Signing
      */
     public static function buildBody(array $payload): string
     {
-        $json = json_encode(
+        return json_encode(
             $payload,
             JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
         );
-
-        return $json;
     }
 
     /**
-     * Sign a request body and return [$bodyBytes, $headers].
+     * Sign a request body (already-serialized bytes, see buildBody())
+     * and return the headers to send alongside it.
      *
-     * @return array{0: string, 1: array<string, string>}
+     * @return array<string, string>
      */
     public static function sign(string $apiKey, string $bodyBytes): array
     {
@@ -50,7 +48,7 @@ final class Signing
         $signedPayload = $timestamp . '.' . $bodyBytes;
         $signature = hash_hmac('sha256', $signedPayload, $apiKey);
 
-        $headers = [
+        return [
             'X-Api-Key' => $apiKey,
             'X-LoGuard-Timestamp' => $timestamp,
             'X-LoGuard-Signature' => 'sha256=' . $signature,
@@ -58,8 +56,6 @@ final class Signing
             'Content-Type' => 'application/json',
             'User-Agent' => self::SDK_NAME . '/' . self::SDK_VERSION,
         ];
-
-        return [$bodyBytes, $headers];
     }
 
     public static function uuidV4(): string

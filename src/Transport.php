@@ -60,7 +60,7 @@ final class Transport
             try {
                 if ($apiKey !== '' && $method === 'POST') {
                     $body = Signing::buildBody($payload);
-                    [$body, $signedHeaders] = Signing::sign($apiKey, $body);
+                    $signedHeaders = Signing::sign($apiKey, $body);
                     [$status, $rawBody] = self::execute($url, $method, $signedHeaders, $body, $timeout);
                 } else {
                     $body = Signing::buildBody($payload);
