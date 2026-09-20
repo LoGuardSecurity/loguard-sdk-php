@@ -30,7 +30,7 @@ return [
     */
     'enabled' => env('LOGUARD_ENABLED', env('LOGUARD_API_KEY') !== null),
 
-    'base_url' => env('LOGUARD_BASE_URL', 'https://loguard.org'),
+    'base_url' => env('LOGUARD_BASE_URL', 'https://api.loguard.org'),
 
     'env' => env('LOGUARD_ENV', env('APP_ENV', 'production')),
 

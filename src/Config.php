@@ -18,7 +18,7 @@ use LoGuard\Sdk\Exceptions\LoGuardValidationException;
  */
 final class Config
 {
-    public const DEFAULT_BASE_URL = 'https://loguard.org';
+    public const DEFAULT_BASE_URL = 'https://api.loguard.org';
     public const DEFAULT_TIMEOUT = 10.0;
     public const DEFAULT_RETRIES = 3;
 

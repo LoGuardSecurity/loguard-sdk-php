@@ -38,15 +38,15 @@ final class ConfigTest extends TestCase
 
     public function testTrailingSlashIsStripped(): void
     {
-        $config = new Config('lg_live_x', 'https://loguard.org/');
-        $this->assertSame('https://loguard.org', $config->baseUrl);
-        $this->assertSame('https://loguard.org/v1/ingest', $config->ingestUrl());
+        $config = new Config('lg_live_x', 'https://api.loguard.org/');
+        $this->assertSame('https://api.loguard.org', $config->baseUrl);
+        $this->assertSame('https://api.loguard.org/v1/ingest', $config->ingestUrl());
     }
 
     public function testDefaultsMatchOtherSdks(): void
     {
         $config = new Config('lg_live_x');
-        $this->assertSame('https://loguard.org', $config->baseUrl);
+        $this->assertSame('https://api.loguard.org', $config->baseUrl);
         $this->assertSame('production', $config->env);
         $this->assertSame(10.0, $config->timeout);
         $this->assertSame(3, $config->retries);

@@ -27,7 +27,7 @@ use LoGuard\Sdk\Config;
 
 $loguard = new Client(new Config(
     apiKey: getenv('LOGUARD_API_KEY'),
-    baseUrl: getenv('LOGUARD_BASE_URL') ?: 'https://loguard.org',
+    baseUrl: getenv('LOGUARD_BASE_URL') ?: 'https://api.loguard.org',
     env: getenv('LOGUARD_ENV') ?: 'production',
 ));
 
