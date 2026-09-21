@@ -113,13 +113,6 @@ final class Config
         return $this->baseUrl . '/v1/ingest';
     }
 
-    public function alertRulesUrl(?int $ruleId = null): string
-    {
-        $base = $this->baseUrl . '/v1/alert-rules';
-
-        return $ruleId !== null ? $base . '/' . $ruleId : $base;
-    }
-
     /** @return array<string, string> */
     public function defaultHeaders(): array
     {

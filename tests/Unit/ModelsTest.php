@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace LoGuard\Sdk\Tests\Unit;
 
-use LoGuard\Sdk\AlertCondition;
-use LoGuard\Sdk\AlertRule;
 use LoGuard\Sdk\Event;
 use LoGuard\Sdk\IngestResult;
 use PHPUnit\Framework\TestCase;
@@ -58,28 +56,6 @@ final class ModelsTest extends TestCase
         $result = IngestResult::fromResponse(['usage' => ['used' => 999999, 'limit' => 0, 'month' => '2026-09']]);
         $this->assertSame(-1, $result->usageInfo()->remaining());
         $this->assertFalse($result->usageInfo()->isNearLimit());
-    }
-
-    public function testAlertRuleRoundTripsThroughArray(): void
-    {
-        $rule = new AlertRule(
-            'Brute force',
-            [
-                new AlertCondition('type', 'eq', 'login_failed'),
-                new AlertCondition('rate_per_minute', 'gt', 10),
-            ],
-            'high',
-            ['notify', 'block']
-        );
-
-        $decoded = json_decode((string) json_encode($rule), true);
-        $restored = AlertRule::fromArray($decoded);
-
-        $this->assertSame('Brute force', $restored->name);
-        $this->assertSame('high', $restored->severity);
-        $this->assertCount(2, $restored->conditions);
-        $this->assertSame('rate_per_minute', $restored->conditions[1]->field);
-        $this->assertSame(10, $restored->conditions[1]->value);
     }
 
     public function testEventJsonShapeMatchesIngestContract(): void

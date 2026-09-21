@@ -30,7 +30,6 @@ use LoGuard\Sdk\Exceptions\LoGuardValidationException;
 final class Client
 {
     private Config $config;
-    private AlertsClient $alerts;
 
     /** @var Event[] */
     private array $pending = [];
@@ -45,7 +44,6 @@ final class Client
     public function __construct(Config $config)
     {
         $this->config = $config;
-        $this->alerts = new AlertsClient($this);
     }
 
     /**
@@ -66,11 +64,6 @@ final class Client
     public function config(): Config
     {
         return $this->config;
-    }
-
-    public function alerts(): AlertsClient
-    {
-        return $this->alerts;
     }
 
     /**
