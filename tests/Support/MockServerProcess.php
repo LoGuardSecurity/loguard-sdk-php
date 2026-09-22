@@ -49,6 +49,37 @@ final class MockServerProcess
         return 'http://127.0.0.1:' . $this->port;
     }
 
+    /**
+     * Reads back the raw body most recently received by the
+     * `/v1/ingest/capture` mock route, decoded as JSON. Returns null if
+     * nothing has been captured yet (or the file was cleared).
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function lastCapturedPayload(): ?array
+    {
+        $file = self::captureFilePath();
+        if (!is_file($file)) {
+            return null;
+        }
+        $decoded = json_decode((string) file_get_contents($file), true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    public static function clearCapture(): void
+    {
+        $file = self::captureFilePath();
+        if (is_file($file)) {
+            unlink($file);
+        }
+    }
+
+    private static function captureFilePath(): string
+    {
+        return sys_get_temp_dir() . '/loguard_mock_capture.json';
+    }
+
     public function stop(): void
     {
         if (is_resource($this->process)) {

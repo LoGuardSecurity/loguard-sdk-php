@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace LoGuard\Sdk\Laravel;
 
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use LoGuard\Sdk\Client;
 use LoGuard\Sdk\Config;
+use LoGuard\Sdk\Event;
 
 /**
  * Registers the LoGuard SDK with a Laravel application.
@@ -37,7 +39,23 @@ final class LoGuardServiceProvider extends ServiceProvider
                 $config['api_key'] = 'lg_disabled_placeholder';
             }
 
-            return new Client(Config::fromArray($config));
+            $client = new Client(Config::fromArray($config));
+
+            // [NEW — audit remediation] Event loss must be observable, not
+            // silent. eventAsync()'s in-memory buffer drops the OLDEST
+            // queued event once full (see Client::$maxQueueSize) --
+            // without this, that drop would never surface anywhere. An
+            // application can still override this by calling
+            // $client->onDropped() again with its own callback (only the
+            // last registration wins).
+            $client->onDropped(function (Event $event): void {
+                Log::warning('loguard: event dropped (in-memory queue full)', [
+                    'type' => $event->type,
+                    'path' => $event->path,
+                ]);
+            });
+
+            return $client;
         });
 
         $this->app->alias(Client::class, 'loguard');

@@ -41,7 +41,14 @@ $result = $loguard->event(
     meta: ['method' => 'POST'],
 );
 
-echo $result->inserted, ' accepted, ', $result->alertsFired, ' alerts fired', PHP_EOL;
+echo $result->inserted, ' accepted', PHP_EOL;
+// $result->alertsFired / $result->alerts reflect ONLY what the server
+// returned synchronously in THIS response. If detection on the backend
+// runs asynchronously, this will be 0 on every call regardless of
+// whether a detector fires moments later -- it is not confirmation that
+// nothing was detected. See IngestResult's docblock, and use LoGuard's
+// Verification feature (in the dashboard) to actually confirm that a
+// detection scenario fires end-to-end, not this field.
 
 // Non-blocking — buffered in memory, flushed automatically at
 // process shutdown (or call $loguard->flush() explicitly).
@@ -109,7 +116,57 @@ protected $middleware = [
 ```
 
 This tracks HTTP error responses (configurable via `loguard.middleware.track_statuses`,
-default `400,401,403,404,429,500,502,503`) as LoGuard events automatically.
+default `400,401,403,404,429,500,502,503`) as LoGuard events automatically —
+**all reported as the generic `http_error` type, including 401**. The
+middleware only sees a status code, not *why* the app returned it, so it
+never guesses `login_failed` from a 401 alone (an expired API token on an
+already-authenticated user would look identical). Set
+`loguard.middleware.track_all_requests` (env `LOGUARD_TRACK_ALL_REQUESTS`)
+to `true` to report every response regardless of status — off by default,
+since it meaningfully changes event volume/plan usage.
+
+### Reporting a confirmed failed login
+
+Call this from your own authentication code, where "this really was a
+login attempt, and it really failed" is actually known — not inferred
+from a status code:
+
+```php
+use LoGuard\Sdk\Laravel\Facades\LoGuard;
+
+LoGuard::recordLoginFailure(ip: $request->ip(), path: '/login', userId: $attemptedUserId);
+```
+
+This is a second, independent signal, not a replacement for the
+middleware's generic `http_error` event — both firing for the same
+request is not double-counting, it's two different claims (raw HTTP
+telemetry vs. a confirmed business event).
+
+### Query/body capture (optional, off by default, per named route)
+
+```php
+// config/loguard.php
+'middleware' => [
+    'track_query_params' => [
+        'search.index' => ['q', 'category'], // Route::name('search.index')
+    ],
+    'track_body_json_paths' => [
+        'auth.login' => ['email'], // dot-path into the JSON body; never list "password" -- stripped anyway
+    ],
+],
+```
+
+Requires a **named route** (`Route::name(...)`) — the allowlist key is the
+route name, not the raw path, so a dynamic segment (`/users/{id}`) doesn't
+need one entry per id. A field whose name matches a secret pattern
+(`password`, `token`, `secret`, `api_key`, `cookie`, ...) is stripped even
+if explicitly listed, at any nesting depth (`LoGuard\Sdk\Http\FieldPolicy::FORBIDDEN_FIELD_PATTERNS`).
+Only `application/json` bodies are ever parsed — multipart/form-data,
+file uploads, and any other content type are skipped outright, never
+partially processed. **This cannot catch a secret embedded inside an
+otherwise innocuous field's free-text value** (e.g. a token pasted into a
+"comment" field) — field-name-based redaction is not content scanning,
+and should not be described to end users as such.
 
 ### 3. Use directly (facade or DI)
 

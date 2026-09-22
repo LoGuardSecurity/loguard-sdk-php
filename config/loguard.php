@@ -62,12 +62,50 @@ return [
         // HTTP status codes that get reported as LoGuard events.
         'track_statuses' => [400, 401, 403, 404, 429, 500, 502, 503],
 
+        // Explicit opt-in: report EVERY response, regardless of status
+        // code (track_statuses is then ignored). Off by default -- this
+        // must be a deliberate decision, since it changes event volume
+        // (and therefore plan usage) substantially compared to the
+        // default. Enable it only after checking your plan's event
+        // quota.
+        'track_all_requests' => (bool) env('LOGUARD_TRACK_ALL_REQUESTS', false),
+
         // Header names to forward to LoGuard's exploit-pattern detectors.
         // Empty by default -- nothing is collected unless you opt in.
         // A fixed deny-list (Authorization, Cookie, Set-Cookie, X-Api-Key,
         // X-Auth-Token, Proxy-Authorization) is enforced in code and can
         // never be overridden here, regardless of what you list.
         'track_headers' => [],
+
+        // Query-parameter capture. Off by default (empty array = nothing
+        // captured for any route). Keyed by NAMED route (Route::name()),
+        // not raw path, so dynamic segments don't need per-id entries.
+        // A field name matching a secret pattern (password, token, etc.)
+        // is stripped even if listed here -- see
+        // LoGuard\Sdk\Http\FieldPolicy::FORBIDDEN_FIELD_PATTERNS.
+        //
+        // 'track_query_params' => [
+        //     'search.index' => ['q', 'category'],
+        // ],
+        'track_query_params' => [],
+
+        // JSON request-body field capture, by dot-separated path, keyed
+        // by named route. Off by default. Only application/json bodies
+        // are ever parsed -- multipart/form-data, file uploads, and any
+        // other content type are never inspected. A field name matching
+        // a secret pattern is stripped even if listed here.
+        //
+        // 'track_body_json_paths' => [
+        //     'auth.login' => ['email'], // never list "password" here -- it would be stripped anyway
+        // ],
+        'track_body_json_paths' => [],
+
+        // Body size (bytes) and JSON nesting depth limits applied BEFORE
+        // parsing -- an oversized or too-deeply-nested body is rejected
+        // outright (flagged in the event's meta as body_too_large /
+        // body_depth_exceeded) rather than partially processed.
+        'max_body_bytes' => 32 * 1024,
+        'max_body_json_depth' => 8,
 
         // IPs/CIDRs of proxies YOU control (e.g. your load balancer).
         // X-Forwarded-For is only trusted when the direct TCP peer is in
