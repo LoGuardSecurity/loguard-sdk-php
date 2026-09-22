@@ -70,6 +70,15 @@ switch ($path) {
         header('Location: https://attacker.example/steal');
         break;
 
+    case '/v1/ingest':
+    case '/v1/ingest/capture':
+        // Records the raw request body so a test can assert on exactly
+        // what the SDK/middleware actually sent, end-to-end over real
+        // HTTP -- not a reconstruction of what the code "should" send.
+        file_put_contents(sys_get_temp_dir() . '/loguard_mock_capture.json', file_get_contents('php://input'));
+        echo json_encode(['ok' => true, 'accepted' => 1, 'dropped' => 0, 'alerts' => [], 'plan' => 'pro', 'usage' => []]);
+        break;
+
     default:
         http_response_code(404);
         echo json_encode(['detail' => 'unknown mock route']);

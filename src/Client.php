@@ -100,6 +100,27 @@ final class Client
     }
 
     /**
+     * Convenience wrapper around eventAsync() for a CONFIRMED failed login
+     * attempt. This is the explicit, opt-in counterpart to removing the
+     * automatic "any HTTP 401 -> login_failed" inference that used to live
+     * in LoGuardMiddleware — call this from your own authentication code
+     * (where "this really was a login attempt, and it really failed" is
+     * actually known), never from generic HTTP-error handling.
+     *
+     * Fire-and-forget, matching eventAsync() -- never throws.
+     *
+     * @param array<string, mixed> $meta
+     */
+    public function recordLoginFailure(
+        string $ip,
+        string $path = '/login',
+        ?string $userId = null,
+        array $meta = []
+    ): void {
+        $this->eventAsync('login_failed', $ip, $path, 401, $userId, null, $meta);
+    }
+
+    /**
      * Track multiple events in a single request.
      *
      * @param array<int, array<string, mixed>> $events Each element uses the same

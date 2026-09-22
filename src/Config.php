@@ -52,7 +52,21 @@ final class Config
                     'proxy on a trusted network during development), pass allowInsecureTransport: true explicitly.'
                 );
             }
-            trigger_error(
+            // [FIX — audit remediation] This must stay a best-effort,
+            // never-fatal nudge to whoever reads their error log. A plain
+            // trigger_error(E_USER_WARNING) is NOT safe for that: Laravel
+            // (via HandleExceptions), Symfony's error handler, and any
+            // app configured to convert warnings into exceptions in
+            // local/testing environments will turn this into a thrown
+            // ErrorException the moment allowInsecureTransport is used —
+            // the exact opposite of "warn, don't break the request" that
+            // Config's own docblock promises. The `@` operator sets
+            // error_reporting(0) for this one statement; every error
+            // handler that respects PHP's error_reporting() bitmask
+            // (Laravel's and Symfony's both do) will then skip promoting
+            // it, while it's still visible in the raw PHP error log for
+            // anyone watching that.
+            @trigger_error(
                 'LoGuard SDK initialized with allowInsecureTransport=true -- api_key and request ' .
                 'signatures are being sent over plaintext. Use this ONLY for local development on ' .
                 'a trusted network, never against a real deployment.',
