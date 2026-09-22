@@ -61,6 +61,15 @@ final class MiddlewareEventContractTest extends OrchestraTestCase
         // body -- same real code path (Config -> Transport -> Signing) as
         // production, nothing bypassed.
         $app['config']->set('loguard.base_url', self::$server->baseUrl());
+        // The loopback mock server only speaks plain HTTP (it's
+        // 127.0.0.1:<port>, no TLS cert to terminate it) -- Config's
+        // constructor otherwise throws LoGuardValidationException on any
+        // non-https:// base_url. That check is correct and stays enabled
+        // in production; this test explicitly opts out of it for the
+        // same reason the exception message itself gives as the
+        // legitimate case: "a local proxy on a trusted network during
+        // development".
+        $app['config']->set('loguard.allow_insecure_transport', true);
         $app['config']->set('loguard.queue_events', false);
     }
 
