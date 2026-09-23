@@ -14,9 +14,14 @@ final class SpoolWorker
 
     public function runOnce(int $batchSize = 50): int
     {
+        return $this->runOnceResult($batchSize)->processed;
+    }
+
+    public function runOnceResult(int $batchSize = 50): SpoolRunResult
+    {
         $events = $this->spool->claim(min(50, max(1, $batchSize)));
         if ($events === []) {
-            return 0;
+            return new SpoolRunResult(0, 0, 0);
         }
 
         $payload = array_map(static function (array $event): array {
@@ -25,9 +30,31 @@ final class SpoolWorker
         }, $events);
 
         try {
-            $this->client->eventBatch($payload);
+            $result = $this->client->eventBatch($payload);
+            $processed = $result->inserted + $result->dropped;
+
+            if (!$result->ok) {
+                throw new \RuntimeException('ingest returned ok=false');
+            }
+
+            if ($processed !== count($events)) {
+                throw new \RuntimeException(
+                    sprintf(
+                        'ingest result mismatch: sent=%d accepted=%d dropped=%d',
+                        count($events),
+                        $result->inserted,
+                        $result->dropped
+                    )
+                );
+            }
+
             $this->spool->complete($events, true);
-            return count($events);
+
+            return new SpoolRunResult(
+                $processed,
+                $result->inserted,
+                $result->dropped
+            );
         } catch (\Throwable $e) {
             $this->spool->complete($events, false);
             throw $e;

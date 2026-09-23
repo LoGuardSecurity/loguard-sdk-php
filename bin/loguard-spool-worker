@@ -36,8 +36,21 @@ try {
             FILTER_VALIDATE_BOOLEAN
         ),
     ]);
-    $sent = (new SpoolWorker(new Client($config), new FileSpool($spoolPath)))->runOnce($batchSize);
-    fwrite(STDOUT, "Sent {$sent} LoGuard event(s).\n");
+    $result = (new SpoolWorker(
+        new Client($config),
+        new FileSpool($spoolPath)
+    ))->runOnceResult($batchSize);
+
+    if ($result->processed > 0) {
+        $message = "Accepted {$result->accepted} LoGuard event(s).";
+
+        if ($result->dropped > 0) {
+            $message .= " {$result->dropped} dropped by server policy.";
+        }
+
+        fwrite(STDOUT, $message . "\n");
+    }
+
     exit(0);
 } catch (Throwable $e) {
     fwrite(STDERR, 'LoGuard spool worker failed: ' . $e->getMessage() . "\n");

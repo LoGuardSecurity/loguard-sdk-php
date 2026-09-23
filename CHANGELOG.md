@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.2 - 2026-09-23
+
+- HTTP middleware now emits generic `http_request` telemetry instead of selecting the detector-specific `http_error` type.
+- Explicit application events such as `http_error` and `login_failed` remain unchanged.
+- Spool delivery validates server `accepted` and `dropped` counts before removing queued events and reports policy drops accurately.
+
 ## 1.0.1 - 2026-09-23
 
 - Fixed autoload resolution for the spool worker when the SDK is installed as a Composer dependency.

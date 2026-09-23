@@ -27,8 +27,34 @@ final class HttpEventFactoryTest extends TestCase
         $event = (new HttpEventFactory())->create($context, $policy);
 
         $this->assertSame('203.0.113.5', $event['ip']);
-        $this->assertSame('http_error', $event['type']);
+        $this->assertSame('http_request', $event['type']);
         $this->assertSame(['email' => 'a@example.test'], $event['meta']['query']);
         $this->assertArrayNotHasKey('Authorization', $event['meta']['headers']);
     }
+
+    public function testTrackedStatusesUseGenericHttpRequestType(): void
+    {
+        $factory = new HttpEventFactory();
+        $policy = new CapturePolicy();
+
+        foreach ([400, 401, 403, 404, 429, 500, 502, 503] as $statusCode) {
+            $context = new RequestContext(
+                'get',
+                '/test',
+                $statusCode,
+                '203.0.113.10'
+            );
+
+            $event = $factory->create($context, $policy);
+
+            $this->assertNotNull($event);
+            $this->assertSame(
+                'http_request',
+                $event['type'],
+                "status {$statusCode} must remain generic HTTP telemetry"
+            );
+            $this->assertSame($statusCode, $event['status_code']);
+        }
+    }
+
 }
