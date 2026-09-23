@@ -7,6 +7,7 @@ namespace LoGuard\Sdk\Tests\Unit;
 use LoGuard\Sdk\Client;
 use LoGuard\Sdk\Config;
 use LoGuard\Sdk\Exceptions\LoGuardValidationException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -40,7 +41,7 @@ final class EventValidationTest extends TestCase
         $this->client()->event('login_failed', '1.2.3.4', '', 401);
     }
 
-    /** @dataProvider invalidStatusCodes */
+    #[DataProvider('invalidStatusCodes')]
     public function testRejectsOutOfRangeStatusCode(int $status): void
     {
         $this->expectException(LoGuardValidationException::class);

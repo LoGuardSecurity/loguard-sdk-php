@@ -49,7 +49,10 @@ final class HeaderPolicy
      */
     public static function sanitizeRequested(array $requested): array
     {
-        $normalized = array_unique(array_map('strtolower', $requested));
+        $normalized = array_unique(array_map(
+            'strtolower',
+            array_values(array_filter($requested, 'is_string'))
+        ));
 
         return array_values(array_diff($normalized, self::FORBIDDEN_HEADERS));
     }

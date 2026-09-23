@@ -21,7 +21,7 @@ namespace LoGuard\Sdk;
 final class Signing
 {
     public const SDK_NAME = 'loguard-php-sdk';
-    public const SDK_VERSION = '1.0.0';
+    public const SDK_VERSION = '1.1.0';
 
     /**
      * Serialize a payload to deterministic, compact JSON bytes.

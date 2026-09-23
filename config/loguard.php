@@ -36,9 +36,11 @@ return [
 
     'service' => env('LOGUARD_SERVICE', env('OTEL_SERVICE_NAME', env('APP_NAME'))),
 
-    'timeout' => (float) env('LOGUARD_TIMEOUT', 10.0),
+    'timeout' => (float) env('LOGUARD_TIMEOUT', 3.0),
 
-    'retries' => (int) env('LOGUARD_RETRIES', 3),
+    'retries' => (int) env('LOGUARD_RETRIES', 2),
+
+    'max_event_bytes' => (int) env('LOGUARD_MAX_EVENT_BYTES', 64 * 1024),
 
     /*
     |--------------------------------------------------------------------------

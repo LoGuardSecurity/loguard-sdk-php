@@ -1,9 +1,9 @@
 {
     "name": "loguard/loguard-sdk",
-    "description": "Official LoGuard SDK for PHP, with first-class Laravel integration.",
+    "description": "Official LoGuard security telemetry SDK for PHP.",
     "type": "library",
     "license": "MIT",
-    "keywords": ["loguard", "security", "monitoring", "waf", "laravel"],
+    "keywords": ["loguard", "security", "monitoring", "waf", "psr-15", "laravel", "codeigniter"],
     "require": {
         "php": "^8.1",
         "ext-curl": "*",
@@ -11,13 +11,18 @@
         "ext-mbstring": "*"
     },
     "require-dev": {
-        "phpunit/phpunit": "^10.5",
-        "orchestra/testbench": "^8.0 || ^9.0",
-        "laravel/framework": "^10.0 || ^11.0",
-        "phpstan/phpstan": "^1.11"
+        "laravel/framework": "^13.23",
+        "orchestra/testbench": "^11.2",
+        "phpstan/phpstan": "^2.2",
+        "phpunit/phpunit": "^12.4",
+        "psr/http-message": "^1.1 || ^2.0",
+        "psr/http-server-handler": "^1.0",
+        "psr/http-server-middleware": "^1.0"
     },
     "suggest": {
-        "laravel/framework": "Required to use the Laravel integration (LoGuard\\Sdk\\Laravel\\*)."
+        "laravel/framework": "Required for the Laravel adapter.",
+        "psr/http-message": "Required for the PSR-15 adapter.",
+        "psr/http-server-middleware": "Required for the PSR-15 adapter."
     },
     "autoload": {
         "psr-4": {
@@ -29,6 +34,9 @@
             "LoGuard\\Sdk\\Tests\\": "tests/"
         }
     },
+    "bin": [
+        "bin/loguard-spool-worker"
+    ],
     "extra": {
         "laravel": {
             "providers": [
@@ -43,5 +51,9 @@
     "prefer-stable": true,
     "config": {
         "sort-packages": true
+    },
+    "scripts": {
+        "test": "phpunit",
+        "phpstan": "phpstan analyse src --level=7"
     }
 }

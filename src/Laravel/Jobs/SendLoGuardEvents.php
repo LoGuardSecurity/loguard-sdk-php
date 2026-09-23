@@ -61,6 +61,6 @@ final class SendLoGuardEvents implements ShouldQueue
         // $tries/$backoff policy above. Swallowing it here would mean
         // silently losing events on a transient failure instead of
         // retrying through the queue's own bounded mechanism.
-        $client->eventBatch($this->events);
+        $client->eventBatch($this->events, 1);
     }
 }
