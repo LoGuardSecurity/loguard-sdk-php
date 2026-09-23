@@ -93,7 +93,7 @@ final class MiddlewareEventContractTest extends OrchestraTestCase
         return MockServerProcess::lastCapturedPayload();
     }
 
-    public function testPlain401IsReportedAsGenericHttpErrorNotLoginFailed(): void
+    public function testPlain401IsReportedAsGenericHttpRequestNotLoginFailed(): void
     {
         config(['loguard.middleware.track_statuses' => [401, 404]]);
 
@@ -103,11 +103,11 @@ final class MiddlewareEventContractTest extends OrchestraTestCase
         $this->assertNotNull($payload, 'middleware must have delivered an event to the mock server');
         $event = $payload['events'][0] ?? null;
         $this->assertNotNull($event);
-        $this->assertSame('http_error', $event['type'], 'a plain 401 must never be auto-classified as login_failed');
+        $this->assertSame('http_request', $event['type'], 'a plain 401 must never be auto-classified as login_failed');
         $this->assertSame(401, $event['status_code']);
     }
 
-    public function test404IsAlsoReportedAsGenericHttpError(): void
+    public function test404IsAlsoReportedAsGenericHttpRequest(): void
     {
         config(['loguard.middleware.track_statuses' => [401, 404]]);
 
@@ -115,7 +115,7 @@ final class MiddlewareEventContractTest extends OrchestraTestCase
 
         $event = $this->capturedPayload()['events'][0] ?? null;
         $this->assertNotNull($event);
-        $this->assertSame('http_error', $event['type']);
+        $this->assertSame('http_request', $event['type']);
     }
 
     public function testUntrackedStatusIsNotReportedByDefault(): void

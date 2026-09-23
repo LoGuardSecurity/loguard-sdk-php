@@ -50,7 +50,7 @@ final class HttpEventFactory
         }
 
         return [
-            'type' => 'http_error',
+            'type' => 'http_request',
             'ip' => ClientIp::resolve($context->directPeerIp, $context->forwardedFor, $policy->trustedProxies),
             'path' => '/' . ltrim($context->path, '/'),
             'status_code' => $context->statusCode,
