@@ -7,9 +7,12 @@ namespace LoGuard\Sdk;
 use DateTimeImmutable;
 use DateTimeInterface;
 use DateTimeZone;
-use LoGuard\Sdk\Exceptions\LoGuardException;
-use LoGuard\Sdk\Exceptions\LoGuardNotInitializedException;
 use LoGuard\Sdk\Exceptions\LoGuardValidationException;
+use LoGuard\Sdk\Contracts\TransportInterface;
+use LoGuard\Sdk\Contracts\EventSinkInterface;
+use LoGuard\Sdk\Privacy\Sanitizer;
+use LoGuard\Sdk\Transport\CurlTransport;
+use Throwable;
 
 /**
  * Core LoGuard client.
@@ -18,18 +21,15 @@ use LoGuard\Sdk\Exceptions\LoGuardValidationException;
  * framework. The Laravel integration (LoGuard\Sdk\Laravel\...) is a
  * thin adapter built entirely on top of this public API.
  *
- * API shape is the idiomatic-PHP equivalent of the canonical
- * initialize / configure / start / capture / event / flush / shutdown
- * lifecycle shared by the other LoGuard SDKs:
- *
- *   initialize + configure + start  -> new Client($config) / Client::init()
- *   capture / event                 -> event() / eventBatch() / eventAsync()
- *   flush                           -> flush()
- *   shutdown                        -> shutdown()
+ * The core has no framework dependency. Framework adapters build events
+ * through this public API and may supply their own transport or queue.
  */
 final class Client
 {
     private Config $config;
+    private TransportInterface $transport;
+    private Sanitizer $sanitizer;
+    private ?EventSinkInterface $eventSink;
 
     /** @var Event[] */
     private array $pending = [];
@@ -41,9 +41,17 @@ final class Client
     /** @var callable|null */
     private $onDropped = null;
 
-    public function __construct(Config $config)
+    public function __construct(
+        Config $config,
+        ?TransportInterface $transport = null,
+        ?Sanitizer $sanitizer = null,
+        ?EventSinkInterface $eventSink = null
+    )
     {
         $this->config = $config;
+        $this->transport = $transport ?? new CurlTransport();
+        $this->sanitizer = $sanitizer ?? new Sanitizer();
+        $this->eventSink = $eventSink;
     }
 
     /**
@@ -126,23 +134,25 @@ final class Client
      * @param array<int, array<string, mixed>> $events Each element uses the same
      *        keys as event()'s named parameters: type, ip, path, status_code, ...
      */
-    public function eventBatch(array $events): IngestResult
+    public function eventBatch(array $events, ?int $attempts = null): IngestResult
     {
+        if (count($events) > $this->maxBatchSize) {
+            throw new LoGuardValidationException("a batch may contain at most {$this->maxBatchSize} events");
+        }
+        if ($attempts !== null && ($attempts < 1 || $attempts > 5)) {
+            throw new LoGuardValidationException('attempts must be between 1 and 5');
+        }
         $built = array_map(fn (array $e) => $this->buildEventFromArray($e), $events);
 
-        return $this->sendEventsSync($built);
+        return $this->sendEventsSync($built, $attempts);
     }
 
     /**
      * Queue an event for later delivery without blocking the caller.
      *
-     * PHP has no persistent background worker inside a single request,
-     * so "fire and forget" here means: buffer in memory (bounded,
-     * oldest-dropped-first once full) and flush automatically when the
-     * process shuts down (register_shutdown_function) or when flush()
-     * is called explicitly. In Laravel, prefer the queue-backed mode
-     * (see LoGuard\Sdk\Laravel — QUEUE_EVENTS config) which dispatches
-     * a real background job instead of relying on shutdown timing.
+     * With an EventSinkInterface this writes to the configured queue or
+     * spool. Without one it uses the bounded compatibility buffer and
+     * flushes during process shutdown.
      *
      * Never throws.
      *
@@ -160,14 +170,26 @@ final class Client
     ): void {
         try {
             $event = $this->buildEvent($type, $ip, $path, $statusCode, $userId, $service, $meta, $ts);
-        } catch (LoGuardException) {
+        } catch (Throwable) {
+            return;
+        }
+
+        if ($this->eventSink !== null) {
+            try {
+                $queued = $this->eventSink->enqueue($event);
+            } catch (Throwable) {
+                $queued = false;
+            }
+            if (!$queued) {
+                $this->notifyDropped($event);
+            }
             return;
         }
 
         if (count($this->pending) >= $this->maxQueueSize) {
             $dropped = array_shift($this->pending);
-            if ($this->onDropped !== null && $dropped !== null) {
-                ($this->onDropped)($dropped);
+            if ($dropped !== null) {
+                $this->notifyDropped($dropped);
             }
         }
 
@@ -186,9 +208,7 @@ final class Client
             $batch = array_splice($this->pending, 0, $this->maxBatchSize);
             try {
                 $this->sendEventsSync($batch);
-            } catch (LoGuardException) {
-                // Best-effort delivery: drop this batch and keep going,
-                // never let a transport failure surface from flush().
+            } catch (Throwable) {
                 continue;
             }
         }
@@ -216,6 +236,18 @@ final class Client
         register_shutdown_function(function (): void {
             $this->flush();
         });
+    }
+
+    private function notifyDropped(Event $event): void
+    {
+        if ($this->onDropped === null) {
+            return;
+        }
+        try {
+            ($this->onDropped)($event);
+        } catch (Throwable) {
+            // Observability callbacks are isolated from application code.
+        }
     }
 
     /**
@@ -256,7 +288,7 @@ final class Client
         ?string $userId,
         ?string $service,
         array $meta,
-        $ts
+        DateTimeInterface|string|null $ts
     ): Event {
         if (trim($type) === '') {
             throw new LoGuardValidationException('event type is required');
@@ -279,7 +311,7 @@ final class Client
             $p = substr($p, 0, 1024);
         }
 
-        $m = $meta;
+        $m = $this->sanitizer->meta($meta);
         $m['env'] = $this->config->env;
 
         $svc = $service ?? $this->config->service;
@@ -293,7 +325,7 @@ final class Client
             $tsString = (new DateTimeImmutable('now', new DateTimeZone('UTC')))->format(DateTimeInterface::ATOM);
         }
 
-        return new Event(
+        $event = new Event(
             mb_substr(strtolower(trim($type)), 0, 64),
             mb_substr(trim($ip), 0, 64),
             $p,
@@ -303,20 +335,31 @@ final class Client
             $svc !== null ? mb_substr(strtolower(trim((string) $svc)), 0, 64) : null,
             $m
         );
+
+        try {
+            $encoded = Signing::buildBody($event->jsonSerialize());
+        } catch (\JsonException $e) {
+            throw new LoGuardValidationException('event contains invalid UTF-8 or non-JSON data', 0, $e);
+        }
+        if (strlen($encoded) > $this->config->maxEventBytes) {
+            throw new LoGuardValidationException('event exceeds max_event_bytes');
+        }
+
+        return $event;
     }
 
     /**
      * @param Event[] $events
      */
-    private function sendEventsSync(array $events): IngestResult
+    private function sendEventsSync(array $events, ?int $attempts = null): IngestResult
     {
         $payload = ['events' => array_map(fn (Event $e) => $e->jsonSerialize(), $events)];
-        $data = Transport::sendSync(
+        $data = $this->transport->send(
             $this->config->ingestUrl(),
             $this->config->defaultHeaders(),
             $payload,
             $this->config->timeout,
-            $this->config->retries,
+            $attempts ?? $this->config->retries,
             'POST',
             $this->config->apiKey
         );

@@ -1,0 +1,34 @@
+<?php
+
+declare(strict_types=1);
+
+namespace LoGuard\Sdk\Tests\Unit;
+
+use LoGuard\Sdk\Http\CapturePolicy;
+use LoGuard\Sdk\Http\HttpEventFactory;
+use LoGuard\Sdk\Http\RequestContext;
+use PHPUnit\Framework\TestCase;
+
+final class HttpEventFactoryTest extends TestCase
+{
+    public function testBuildsFrameworkNeutralEvent(): void
+    {
+        $context = new RequestContext(
+            'post', '/login', 401, '10.0.0.2', '203.0.113.5, 10.0.0.2',
+            'auth.login', null, ['User-Agent' => ['test'], 'Authorization' => ['secret']],
+            ['email' => 'a@example.test', 'token' => 'secret']
+        );
+        $policy = new CapturePolicy(
+            headers: ['User-Agent', 'Authorization'],
+            queryByRoute: ['auth.login' => ['email', 'token']],
+            trustedProxies: ['10.0.0.0/8']
+        );
+
+        $event = (new HttpEventFactory())->create($context, $policy);
+
+        $this->assertSame('203.0.113.5', $event['ip']);
+        $this->assertSame('http_error', $event['type']);
+        $this->assertSame(['email' => 'a@example.test'], $event['meta']['query']);
+        $this->assertArrayNotHasKey('Authorization', $event['meta']['headers']);
+    }
+}

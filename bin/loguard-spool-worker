@@ -1,0 +1,42 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use LoGuard\Sdk\Client;
+use LoGuard\Sdk\Config;
+use LoGuard\Sdk\Dispatch\FileSpool;
+use LoGuard\Sdk\Dispatch\SpoolWorker;
+
+$autoload = dirname(__DIR__) . '/vendor/autoload.php';
+if (!is_file($autoload)) {
+    fwrite(STDERR, "Composer autoload file not found. Run composer install first.\n");
+    exit(2);
+}
+require $autoload;
+
+$apiKey = (string) getenv('LOGUARD_API_KEY');
+$spoolPath = (string) (getenv('LOGUARD_SPOOL_PATH') ?: '/var/spool/loguard');
+$batchSize = (int) (getenv('LOGUARD_BATCH_SIZE') ?: 50);
+
+try {
+    $config = Config::fromArray([
+        'api_key' => $apiKey,
+        'base_url' => getenv('LOGUARD_BASE_URL') ?: Config::DEFAULT_BASE_URL,
+        'env' => getenv('LOGUARD_ENV') ?: 'production',
+        'service' => getenv('LOGUARD_SERVICE') ?: null,
+        'timeout' => getenv('LOGUARD_TIMEOUT') ?: Config::DEFAULT_TIMEOUT,
+        'retries' => getenv('LOGUARD_RETRIES') ?: Config::DEFAULT_RETRIES,
+        'max_event_bytes' => getenv('LOGUARD_MAX_EVENT_BYTES') ?: Config::DEFAULT_MAX_EVENT_BYTES,
+        'allow_insecure_transport' => filter_var(
+            getenv('LOGUARD_ALLOW_INSECURE_TRANSPORT') ?: 'false',
+            FILTER_VALIDATE_BOOLEAN
+        ),
+    ]);
+    $sent = (new SpoolWorker(new Client($config), new FileSpool($spoolPath)))->runOnce($batchSize);
+    fwrite(STDOUT, "Sent {$sent} LoGuard event(s).\n");
+    exit(0);
+} catch (Throwable $e) {
+    fwrite(STDERR, 'LoGuard spool worker failed: ' . $e->getMessage() . "\n");
+    exit(1);
+}

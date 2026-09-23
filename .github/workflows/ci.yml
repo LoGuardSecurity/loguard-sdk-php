@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  core-compatibility:
+    name: Core / PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.1', '8.2']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, json, mbstring
+          coverage: none
+          tools: composer:v2
+
+      - run: composer validate --strict
+      - run: composer dump-autoload --no-dev --classmap-authoritative
+      - run: find src config bin -type f \( -name '*.php' -o -path 'bin/loguard-spool-worker' \) -print0 | xargs -0 -n1 php -l
+      - run: php tests/Compatibility/CoreSmoke.php
+
+  full:
+    name: Full / PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4', '8.5']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, json, mbstring
+          coverage: none
+          tools: composer:v2
+
+      - run: composer update --no-interaction --prefer-dist
+      - run: composer audit
+      - run: composer test
+      - run: composer phpstan

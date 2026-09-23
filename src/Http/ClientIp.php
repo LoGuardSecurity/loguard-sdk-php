@@ -42,9 +42,12 @@ final class ClientIp
             return $directPeerIp;
         }
 
-        $candidate = trim(explode(',', $xForwardedFor)[0]);
-        if (self::isValidIp($candidate)) {
-            return $candidate;
+        $chain = array_values(array_filter(array_map('trim', explode(',', $xForwardedFor)), [self::class, 'isValidIp']));
+        $chain[] = $directPeerIp;
+        for ($i = count($chain) - 1; $i >= 0; $i--) {
+            if (!self::ipMatchesAny($chain[$i], $trustedProxies)) {
+                return $chain[$i];
+            }
         }
 
         return $directPeerIp;
@@ -85,6 +88,10 @@ final class ClientIp
         }
 
         $maskLen = (int) $maskLen;
+        $maxBits = strlen($ipBin) * 8;
+        if ($maskLen < 0 || $maskLen > $maxBits) {
+            return false;
+        }
         $bytes = intdiv($maskLen, 8);
         $bits = $maskLen % 8;
 

@@ -1,0 +1,6 @@
+parameters:
+    level: 7
+    paths:
+        - src
+    scanFiles:
+        - phpstan/CodeIgniter3.stub.php

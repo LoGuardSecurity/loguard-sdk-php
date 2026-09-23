@@ -19,8 +19,9 @@ use LoGuard\Sdk\Exceptions\LoGuardValidationException;
 final class Config
 {
     public const DEFAULT_BASE_URL = 'https://api.loguard.org';
-    public const DEFAULT_TIMEOUT = 10.0;
-    public const DEFAULT_RETRIES = 3;
+    public const DEFAULT_TIMEOUT = 3.0;
+    public const DEFAULT_RETRIES = 2;
+    public const DEFAULT_MAX_EVENT_BYTES = 64 * 1024;
 
     public readonly string $apiKey;
     public readonly string $baseUrl;
@@ -29,6 +30,7 @@ final class Config
     public readonly int $retries;
     public readonly ?string $service;
     public readonly bool $allowInsecureTransport;
+    public readonly int $maxEventBytes;
 
     public function __construct(
         string $apiKey,
@@ -37,14 +39,24 @@ final class Config
         float $timeout = self::DEFAULT_TIMEOUT,
         int $retries = self::DEFAULT_RETRIES,
         ?string $service = null,
-        bool $allowInsecureTransport = false
+        bool $allowInsecureTransport = false,
+        int $maxEventBytes = self::DEFAULT_MAX_EVENT_BYTES
     ) {
         if (trim($apiKey) === '') {
             throw new LoGuardAuthException('api_key is required');
         }
 
-        $baseUrl = rtrim($baseUrl, '/');
-        if (stripos($baseUrl, 'https://') !== 0) {
+        $baseUrl = rtrim(trim($baseUrl), '/');
+        $parts = parse_url($baseUrl);
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])
+            || isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])) {
+            throw new LoGuardValidationException('base_url must be an absolute URL without credentials, query or fragment');
+        }
+        $scheme = strtolower((string) $parts['scheme']);
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            throw new LoGuardValidationException('base_url must use http:// or https://');
+        }
+        if ($scheme !== 'https') {
             if (!$allowInsecureTransport) {
                 throw new LoGuardValidationException(
                     'base_url must use https:// -- your api_key is sent on every request and ' .
@@ -52,20 +64,6 @@ final class Config
                     'proxy on a trusted network during development), pass allowInsecureTransport: true explicitly.'
                 );
             }
-            // [FIX — audit remediation] This must stay a best-effort,
-            // never-fatal nudge to whoever reads their error log. A plain
-            // trigger_error(E_USER_WARNING) is NOT safe for that: Laravel
-            // (via HandleExceptions), Symfony's error handler, and any
-            // app configured to convert warnings into exceptions in
-            // local/testing environments will turn this into a thrown
-            // ErrorException the moment allowInsecureTransport is used —
-            // the exact opposite of "warn, don't break the request" that
-            // Config's own docblock promises. The `@` operator sets
-            // error_reporting(0) for this one statement; every error
-            // handler that respects PHP's error_reporting() bitmask
-            // (Laravel's and Symfony's both do) will then skip promoting
-            // it, while it's still visible in the raw PHP error log for
-            // anyone watching that.
             @trigger_error(
                 'LoGuard SDK initialized with allowInsecureTransport=true -- api_key and request ' .
                 'signatures are being sent over plaintext. Use this ONLY for local development on ' .
@@ -74,13 +72,24 @@ final class Config
             );
         }
 
+        if (!is_finite($timeout) || $timeout < 0.1 || $timeout > 30.0) {
+            throw new LoGuardValidationException('timeout must be between 0.1 and 30 seconds');
+        }
+        if ($retries < 1 || $retries > 5) {
+            throw new LoGuardValidationException('retries must be between 1 and 5');
+        }
+        if ($maxEventBytes < 1024 || $maxEventBytes > 1024 * 1024) {
+            throw new LoGuardValidationException('max_event_bytes must be between 1024 and 1048576');
+        }
+
         $this->apiKey = trim($apiKey);
         $this->baseUrl = $baseUrl;
         $this->env = $env !== '' ? $env : 'production';
         $this->timeout = $timeout;
-        $this->retries = max(1, $retries);
+        $this->retries = $retries;
         $this->service = self::resolveService($service);
         $this->allowInsecureTransport = $allowInsecureTransport;
+        $this->maxEventBytes = $maxEventBytes;
     }
 
     /**
@@ -118,7 +127,8 @@ final class Config
             (float) ($c['timeout'] ?? self::DEFAULT_TIMEOUT),
             (int) ($c['retries'] ?? self::DEFAULT_RETRIES),
             isset($c['service']) ? (string) $c['service'] : null,
-            (bool) ($c['allow_insecure_transport'] ?? false)
+            (bool) ($c['allow_insecure_transport'] ?? false),
+            (int) ($c['max_event_bytes'] ?? self::DEFAULT_MAX_EVENT_BYTES)
         );
     }
 

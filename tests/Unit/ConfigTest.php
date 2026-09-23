@@ -7,6 +7,7 @@ namespace LoGuard\Sdk\Tests\Unit;
 use LoGuard\Sdk\Config;
 use LoGuard\Sdk\Exceptions\LoGuardAuthException;
 use LoGuard\Sdk\Exceptions\LoGuardValidationException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class ConfigTest extends TestCase
@@ -43,13 +44,36 @@ final class ConfigTest extends TestCase
         $this->assertSame('https://api.loguard.org/v1/ingest', $config->ingestUrl());
     }
 
-    public function testDefaultsMatchOtherSdks(): void
+    public function testSafeDefaults(): void
     {
         $config = new Config('lg_live_x');
         $this->assertSame('https://api.loguard.org', $config->baseUrl);
         $this->assertSame('production', $config->env);
-        $this->assertSame(10.0, $config->timeout);
-        $this->assertSame(3, $config->retries);
+        $this->assertSame(3.0, $config->timeout);
+        $this->assertSame(2, $config->retries);
+        $this->assertSame(64 * 1024, $config->maxEventBytes);
+    }
+
+    #[DataProvider('invalidSettings')]
+    public function testRejectsUnsafeBounds(float $timeout, int $retries, int $maxBytes): void
+    {
+        $this->expectException(LoGuardValidationException::class);
+        new Config('lg_live_x', timeout: $timeout, retries: $retries, maxEventBytes: $maxBytes);
+    }
+
+    public static function invalidSettings(): array
+    {
+        return [
+            'zero timeout' => [0.0, 2, 65536],
+            'too many attempts' => [3.0, 99, 65536],
+            'unbounded event' => [3.0, 2, 2 * 1024 * 1024],
+        ];
+    }
+
+    public function testRejectsCredentialsInBaseUrl(): void
+    {
+        $this->expectException(LoGuardValidationException::class);
+        new Config('lg_live_x', 'https://user:pass@example.test');
     }
 
     public function testFromArray(): void

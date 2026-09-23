@@ -99,12 +99,10 @@ final class TransportIntegrationTest extends TestCase
         Transport::sendSync(self::$server->baseUrl() . '/v1/ingest/quota', [], ['events' => []], 2.0, 1, 'POST', 'test-key');
     }
 
-    public function testMalformedJsonResponseDoesNotCrashTheClient(): void
+    public function testMalformedJsonResponseIsRejected(): void
     {
-        // 200 OK with a broken body must not throw a fatal error --
-        // it should decode to null/empty rather than blow up.
-        $result = Transport::sendSync(self::$server->baseUrl() . '/v1/ingest/malformed-json', [], ['events' => []], 2.0, 1, 'POST', 'test-key');
-        $this->assertNull($result);
+        $this->expectException(LoGuardConnectionException::class);
+        Transport::sendSync(self::$server->baseUrl() . '/v1/ingest/malformed-json', [], ['events' => []], 2.0, 1, 'POST', 'test-key');
     }
 
     public function testOversizedResponseIsAbortedNotBuffered(): void
@@ -119,15 +117,7 @@ final class TransportIntegrationTest extends TestCase
 
     public function testRedirectIsNeverFollowed(): void
     {
-        // A 3xx must be treated as a plain non-2xx result, never silently
-        // re-sent (with the signed API key) to a second, attacker-influenced
-        // URL.
-        $result = Transport::sendSync(self::$server->baseUrl() . '/v1/ingest/redirect', [], ['events' => []], 2.0, 1, 'POST', 'test-key');
-        // Status 302 is not in the retry set and not a mapped error status,
-        // so raiseForStatus() returns the (empty) decoded body as-is --
-        // the important assertion is that this call did NOT reach
-        // attacker.example, which curl would have surfaced as a distinct
-        // resolve/connect failure for that host if it had tried.
-        $this->assertNull($result);
+        $this->expectException(LoGuardConnectionException::class);
+        Transport::sendSync(self::$server->baseUrl() . '/v1/ingest/redirect', [], ['events' => []], 2.0, 1, 'POST', 'test-key');
     }
 }

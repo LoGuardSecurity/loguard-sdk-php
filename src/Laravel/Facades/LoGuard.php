@@ -8,10 +8,10 @@ use Illuminate\Support\Facades\Facade;
 use LoGuard\Sdk\IngestResult;
 
 /**
- * @method static IngestResult event(string $type, string $ip, string $path, int $statusCode, ?string $userId = null, ?string $service = null, array $meta = [], ?\DateTimeInterface $ts = null)
- * @method static IngestResult eventBatch(array $events)
- * @method static void eventAsync(string $type, string $ip, string $path, int $statusCode, ?string $userId = null, ?string $service = null, array $meta = [], ?\DateTimeInterface $ts = null)
- * @method static void recordLoginFailure(string $ip, string $path = '/login', ?string $userId = null, array $meta = [])
+ * @method static IngestResult event(string $type, string $ip, string $path, int $statusCode, ?string $userId = null, ?string $service = null, array<string, mixed> $meta = [], ?\DateTimeInterface $ts = null)
+ * @method static IngestResult eventBatch(array<int, array<string, mixed>> $events)
+ * @method static void eventAsync(string $type, string $ip, string $path, int $statusCode, ?string $userId = null, ?string $service = null, array<string, mixed> $meta = [], ?\DateTimeInterface $ts = null)
+ * @method static void recordLoginFailure(string $ip, string $path = '/login', ?string $userId = null, array<string, mixed> $meta = [])
  * @method static void flush()
  * @method static void shutdown()
  *

@@ -13,8 +13,8 @@ use Orchestra\Testbench\TestCase as OrchestraTestCase;
 /**
  * @group integration
  *
- * End-to-end regression coverage for the audit-remediation changes:
- * asserts on the ACTUAL JSON body the middleware sends over real HTTP
+ * End-to-end coverage for the HTTP event contract. It checks the JSON
+ * body the middleware sends over real HTTP
  * to a loopback mock server (via `/v1/ingest/capture`, see
  * MockServerProcess::lastCapturedPayload()) rather than reconstructing
  * what the code "should" send -- this is what would have caught the

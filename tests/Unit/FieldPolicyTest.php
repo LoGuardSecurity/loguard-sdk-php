@@ -139,4 +139,23 @@ final class FieldPolicyTest extends TestCase
         $this->assertTrue(FieldPolicy::isForbiddenFieldName('user_PASSWORD_hash'));
         $this->assertFalse(FieldPolicy::isForbiddenFieldName('email'));
     }
+
+    public function testLegitimateAuthenticationMetadataIsNotRemoved(): void
+    {
+        $captured = FieldPolicy::captureQuery(
+            ['auth_method', 'authentication_result', 'authorization', 'auth_token'],
+            [
+                'auth_method' => 'webauthn',
+                'authentication_result' => 'failed',
+                'authorization' => 'Bearer secret',
+                'auth_token' => 'secret',
+            ]
+        );
+
+        $this->assertSame('webauthn', $captured['auth_method']);
+        $this->assertSame('failed', $captured['authentication_result']);
+        $this->assertArrayNotHasKey('authorization', $captured);
+        $this->assertArrayNotHasKey('auth_token', $captured);
+    }
+
 }

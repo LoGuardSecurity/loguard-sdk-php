@@ -4,14 +4,7 @@ declare(strict_types=1);
 
 namespace LoGuard\Sdk;
 
-/**
- * A single security event as sent to POST /v1/ingest.
- *
- * Field shape and validation rules are intentionally identical to the
- * canonical Python/Node/Go/C# SDKs (see loguard/models.py Event and
- * monitor.py _build_event) so the wire payload is indistinguishable
- * between SDKs.
- */
+/** A single security event sent to POST /v1/ingest. */
 final class Event implements \JsonSerializable
 {
     public string $type;

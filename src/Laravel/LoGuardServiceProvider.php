@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LoGuard\Sdk\Laravel;
 
+use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
@@ -26,7 +27,8 @@ final class LoGuardServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__ . '/../../config/loguard.php', 'loguard');
 
         $this->app->singleton(Client::class, function (Application $app): Client {
-            $config = (array) $app['config']->get('loguard', []);
+            $configRepository = $app->make(Repository::class);
+            $config = (array) $configRepository->get('loguard', []);
 
             // Disabled installs (no api_key / LOGUARD_ENABLED=false) still
             // get a real Client so DI + the middleware never has to
@@ -41,13 +43,7 @@ final class LoGuardServiceProvider extends ServiceProvider
 
             $client = new Client(Config::fromArray($config));
 
-            // [NEW — audit remediation] Event loss must be observable, not
-            // silent. eventAsync()'s in-memory buffer drops the OLDEST
-            // queued event once full (see Client::$maxQueueSize) --
-            // without this, that drop would never surface anywhere. An
-            // application can still override this by calling
-            // $client->onDropped() again with its own callback (only the
-            // last registration wins).
+            // Keep local buffer pressure visible in normal application logs.
             $client->onDropped(function (Event $event): void {
                 Log::warning('loguard: event dropped (in-memory queue full)', [
                     'type' => $event->type,

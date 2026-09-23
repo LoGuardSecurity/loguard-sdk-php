@@ -7,18 +7,8 @@ namespace LoGuard\Sdk\Http;
 /**
  * Opt-in, allowlist-based query/body field capture for HTTP middleware.
  *
- * Mirrors the design of HeaderPolicy (forbidden set enforced in code, not
- * just documented) but for query parameters and JSON request bodies,
- * which were not previously collected by this SDK at all (see
- * docs/SECURITY.md: "No request body or query string is ever collected
- * automatically" — this class is what makes that collection possible,
- * strictly opt-in and per-route).
- *
- * [WHAT THIS CANNOT GUARANTEE] Field-name-based redaction cannot catch a
- * secret embedded inside an otherwise innocuously-named field's free-text
- * value (e.g. a token pasted into a "comment" field). This must be
- * communicated to whoever configures track_body_json_paths, not silently
- * assumed away.
+ * Capture stays off until a route and field allowlist is supplied. Secret
+ * field names are removed even when they were allowlisted accidentally.
  */
 final class FieldPolicy
 {
@@ -31,14 +21,15 @@ final class FieldPolicy
         'password', 'passwd', 'pwd', 'secret', 'token', 'access_token', 'refresh_token',
         'api_key', 'apikey', 'authorization', 'cookie', 'session', 'csrf', 'xsrf',
         'private_key', 'client_secret', 'ssn', 'card_number', 'card_num', 'cvv', 'cvc',
-        'credit_card', 'pin', 'otp', 'auth',
+        'credit_card', 'pin', 'otp',
+        'auth_token', 'authentication_token', 'auth_secret', 'auth_password',
     ];
 
     public const DEFAULT_MAX_BODY_BYTES = 32 * 1024;
     public const DEFAULT_MAX_JSON_DEPTH = 8;
 
     /**
-     * @param string[] $allowedNames Exact query-parameter names to keep for this route.
+     * @param array<array-key, mixed> $allowedNames Exact query-parameter names to keep for this route.
      * @param array<string, mixed> $queryParams Already-parsed query parameters
      *        (e.g. Laravel's $request->query()) — this class does not parse
      *        raw query strings itself, since the framework's own parser
@@ -55,6 +46,9 @@ final class FieldPolicy
 
         $result = [];
         foreach ($allowedNames as $name) {
+            if (!is_string($name)) {
+                continue;
+            }
             if (!array_key_exists($name, $queryParams)) {
                 continue;
             }
@@ -68,7 +62,7 @@ final class FieldPolicy
     }
 
     /**
-     * @param string[] $allowedJsonPaths Dot-separated paths, e.g. "user.email".
+     * @param array<array-key, mixed> $allowedJsonPaths Dot-separated paths, e.g. "user.email".
      *        A path whose final segment matches a forbidden pattern is
      *        never captured, even if explicitly listed here by mistake.
      * @param string|null $rawBody Already-buffered request body (Laravel's
@@ -125,6 +119,9 @@ final class FieldPolicy
 
         $filtered = [];
         foreach ($allowedJsonPaths as $path) {
+            if (!is_string($path) || $path === '') {
+                continue;
+            }
             $parts = explode('.', $path);
             $leaf = end($parts);
             if (self::isForbiddenFieldName((string) $leaf)) {
@@ -144,7 +141,10 @@ final class FieldPolicy
 
     private const NOT_FOUND = "\0__loguard_not_found__\0";
 
-    /** @param string[] $path */
+    /**
+     * @param array<array-key, mixed> $data
+     * @param list<string> $path
+     */
     private static function getByPath(array $data, array $path): mixed
     {
         $current = $data;
@@ -158,7 +158,10 @@ final class FieldPolicy
         return $current;
     }
 
-    /** @param string[] $path */
+    /**
+     * @param array<string, mixed> $target
+     * @param list<string> $path
+     */
     private static function setByPath(array &$target, array $path, mixed $value): void
     {
         $key = array_shift($path);

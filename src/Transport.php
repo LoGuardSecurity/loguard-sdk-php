@@ -38,6 +38,7 @@ use LoGuard\Sdk\Exceptions\LoGuardValidationException;
 final class Transport
 {
     private const RETRY_STATUSES = [500, 502, 503, 504];
+    private const MAX_REQUEST_BYTES = 5 * 1024 * 1024;
     private const MAX_RESPONSE_BYTES = 5 * 1024 * 1024; // 5 MiB
 
     /**
@@ -54,16 +55,19 @@ final class Transport
         string $method = 'POST',
         string $apiKey = ''
     ) {
+        self::validateLimits($timeout, $retries);
         $lastException = new LoGuardConnectionException('Unknown error');
 
         for ($attempt = 1; $attempt <= max(1, $retries); $attempt++) {
             try {
                 if ($apiKey !== '' && $method === 'POST') {
                     $body = Signing::buildBody($payload);
+                    self::validateRequestSize($body);
                     $signedHeaders = Signing::sign($apiKey, $body);
                     [$status, $rawBody] = self::execute($url, $method, $signedHeaders, $body, $timeout);
                 } else {
                     $body = Signing::buildBody($payload);
+                    self::validateRequestSize($body);
                     [$status, $rawBody] = self::execute($url, $method, $headers, $body, $timeout);
                 }
 
@@ -95,6 +99,7 @@ final class Transport
         int $retries,
         string $method = 'GET'
     ) {
+        self::validateLimits($timeout, $retries);
         $lastException = new LoGuardConnectionException('Unknown error');
 
         for ($attempt = 1; $attempt <= max(1, $retries); $attempt++) {
@@ -124,6 +129,16 @@ final class Transport
      */
     private static function execute(string $url, string $method, array $headers, ?string $body, float $timeout): array
     {
+        $url = trim($url);
+        if ($url === '') {
+            throw new TransportIoException('request URL must not be empty');
+        }
+
+        $method = strtoupper(trim($method));
+        if ($method === '') {
+            throw new TransportIoException('HTTP method must not be empty');
+        }
+
         $ch = curl_init();
         if ($ch === false) {
             throw new TransportIoException('failed to initialize curl handle');
@@ -147,7 +162,7 @@ final class Transport
 
         curl_setopt_array($ch, [
             CURLOPT_URL => $url,
-            CURLOPT_CUSTOMREQUEST => strtoupper($method),
+            CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_HTTPHEADER => $headerLines,
             CURLOPT_RETURNTRANSFER => false,
             CURLOPT_WRITEFUNCTION => $writeFn,
@@ -163,7 +178,7 @@ final class Transport
             CURLOPT_NOSIGNAL => true,
         ]);
 
-        if ($body !== null && strtoupper($method) !== 'GET') {
+        if ($body !== null && $method !== 'GET') {
             curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
         }
 
@@ -171,7 +186,6 @@ final class Transport
         $errno = curl_errno($ch);
         $error = curl_error($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        curl_close($ch);
 
         if ($errno !== 0) {
             throw new TransportIoException("curl error ({$errno}): {$error}");
@@ -194,6 +208,9 @@ final class Transport
         $d = is_array($decoded) ? $decoded : [];
         $snippet = substr($rawBody, 0, 400);
 
+        if ($status >= 300 && $status < 400) {
+            throw new LoGuardConnectionException("Unexpected redirect ({$status}); redirects are disabled");
+        }
         if ($status === 401) {
             throw new LoGuardAuthException('Invalid API key');
         }
@@ -232,7 +249,32 @@ final class Transport
             throw new LoGuardConnectionException("Server error ({$status}): {$snippet}");
         }
 
+        if ($status < 200 || $status >= 300) {
+            throw new LoGuardConnectionException("Unexpected HTTP status ({$status}): {$snippet}");
+        }
+
+        if (!is_array($decoded)) {
+            throw new LoGuardConnectionException('LoGuard returned an invalid JSON response');
+        }
+
         return $decoded;
+    }
+
+    private static function validateLimits(float $timeout, int $retries): void
+    {
+        if (!is_finite($timeout) || $timeout < 0.1 || $timeout > 30.0) {
+            throw new LoGuardValidationException('timeout must be between 0.1 and 30 seconds');
+        }
+        if ($retries < 1 || $retries > 5) {
+            throw new LoGuardValidationException('retries must be between 1 and 5');
+        }
+    }
+
+    private static function validateRequestSize(string $body): void
+    {
+        if (strlen($body) > self::MAX_REQUEST_BYTES) {
+            throw new LoGuardValidationException('request body exceeds 5 MiB');
+        }
     }
 }
 
