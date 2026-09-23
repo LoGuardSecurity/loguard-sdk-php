@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1 - 2026-09-23
+
+- Fixed autoload resolution for the spool worker when the SDK is installed as a Composer dependency.
+- Added a package-install regression test for the Composer binary.
+
 ## 1.0.0 - 2026-09-23
 
 - Added injectable transport and event sink contracts.
