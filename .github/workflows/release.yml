@@ -63,7 +63,10 @@ jobs:
           checksum="${archive}.sha256"
           test -s "$archive"
           test -s "$checksum"
-          sha256sum -c "$checksum"
+          (
+            cd dist
+            sha256sum -c "loguard-php-sdk-${version}.zip.sha256"
+          )
 
       - name: Publish GitHub release
         env:
