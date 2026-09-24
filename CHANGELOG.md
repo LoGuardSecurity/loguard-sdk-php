@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.3 - 2026-09-24
+
+- Added an official standalone ZIP distribution for environments where Composer packages cannot be installed.
+
+- Added a constrained local PSR-4 autoloader with no third-party runtime dependencies.
+
+- Added standalone support to the durable spool worker while preserving Composer autoload resolution.
+
+- Added archive integrity checks, content allowlisting and CI coverage across PHP 8.1–8.5.
+
+- Documented local installation and SHA-256 verification; remote runtime loading from a CDN is explicitly unsupported.
 ## 1.0.2 - 2026-09-23
 
 - HTTP middleware now emits generic `http_request` telemetry instead of selecting the detector-specific `http_error` type.

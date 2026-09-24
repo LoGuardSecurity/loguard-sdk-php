@@ -12,9 +12,20 @@ CodeIgniter 3.
 
 ## Installation
 
+Composer is the preferred installation method:
+
 ```bash
 composer require loguard/loguard-sdk
 ```
+
+If the deployment environment cannot install Composer packages, use the
+official standalone ZIP from the LoGuard GitHub release. Download and verify
+the archive during deployment, extract it outside the public web root, and
+load its local `autoload.php`.
+
+Do not load PHP code remotely from a CDN at request time.
+
+See [Standalone installation](docs/STANDALONE.md) for the complete procedure.
 
 ## Plain PHP
 

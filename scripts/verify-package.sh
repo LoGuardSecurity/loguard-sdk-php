@@ -11,5 +11,7 @@ composer validate --strict
 composer install --no-interaction --prefer-dist
 composer test
 composer phpstan
+./scripts/test-installed-bin.sh
+./scripts/test-standalone.sh
 
 printf '%s\n' 'LoGuard PHP SDK verification passed.'

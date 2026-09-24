@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  standalone-release:
+    name: Standalone release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: curl, json, mbstring
+          coverage: none
+          tools: composer:v2
+
+      - name: Validate release tag
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          version="${tag#v}"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Unsupported release tag: $tag" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify package
+        run: ./scripts/verify-package.sh
+
+      - name: Build standalone archive
+        run: ./scripts/build-standalone.sh "${{ steps.version.outputs.version }}"
+
+      - name: Verify release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.version.outputs.version }}"
+          archive="dist/loguard-php-sdk-${version}.zip"
+          checksum="${archive}.sha256"
+          test -s "$archive"
+          test -s "$checksum"
+          sha256sum -c "$checksum"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.version.outputs.version }}"
+          archive="dist/loguard-php-sdk-${version}.zip"
+          checksum="${archive}.sha256"
+          gh release create "$GITHUB_REF_NAME" \
+            "$archive" \
+            "$checksum" \
+            --verify-tag \
+            --title "LoGuard PHP SDK $GITHUB_REF_NAME" \
+            --generate-notes

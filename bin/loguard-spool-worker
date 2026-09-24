@@ -8,11 +8,33 @@ use LoGuard\Sdk\Config;
 use LoGuard\Sdk\Dispatch\FileSpool;
 use LoGuard\Sdk\Dispatch\SpoolWorker;
 
-$autoload = $GLOBALS['_composer_autoload_path']
-    ?? dirname(__DIR__) . '/vendor/autoload.php';
+$autoloadCandidates = [];
 
-if (!is_string($autoload) || !is_file($autoload)) {
-    fwrite(STDERR, "Composer autoload file not found. Run composer install first.\n");
+if (
+    isset($GLOBALS['_composer_autoload_path'])
+    && is_string($GLOBALS['_composer_autoload_path'])
+) {
+    $autoloadCandidates[] = $GLOBALS['_composer_autoload_path'];
+}
+
+$autoloadCandidates[] = dirname(__DIR__) . '/vendor/autoload.php';
+$autoloadCandidates[] = dirname(__DIR__) . '/autoload.php';
+
+$autoload = null;
+
+foreach ($autoloadCandidates as $candidate) {
+    if (is_file($candidate)) {
+        $autoload = $candidate;
+        break;
+    }
+}
+
+if ($autoload === null) {
+    fwrite(
+        STDERR,
+        "LoGuard SDK autoload file not found. Install with Composer "
+        . "or use the official standalone package.\n"
+    );
     exit(2);
 }
 
