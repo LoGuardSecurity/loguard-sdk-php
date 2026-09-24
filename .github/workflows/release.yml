@@ -5,6 +5,13 @@ on:
     tags:
       - 'v*'
 
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to recover
+        required: true
+        type: string
+
 permissions:
   contents: write
 
@@ -13,12 +20,17 @@ jobs:
     name: Standalone release
     runs-on: ubuntu-latest
 
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.1'
+          php-version: '8.5'
           extensions: curl, json, mbstring
           coverage: none
           tools: composer:v2
@@ -28,7 +40,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag="$GITHUB_REF_NAME"
+          tag="$RELEASE_TAG"
           version="${tag#v}"
           if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "Unsupported release tag: $tag" >&2
@@ -62,9 +74,9 @@ jobs:
           version="${{ steps.version.outputs.version }}"
           archive="dist/loguard-php-sdk-${version}.zip"
           checksum="${archive}.sha256"
-          gh release create "$GITHUB_REF_NAME" \
+          gh release create "$RELEASE_TAG" \
             "$archive" \
             "$checksum" \
             --verify-tag \
-            --title "LoGuard PHP SDK $GITHUB_REF_NAME" \
+            --title "LoGuard PHP SDK $RELEASE_TAG" \
             --generate-notes
