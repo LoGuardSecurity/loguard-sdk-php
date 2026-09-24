@@ -30,6 +30,7 @@ jobs:
       - run: composer dump-autoload --no-dev --classmap-authoritative
       - run: find src config bin -type f \( -name '*.php' -o -path 'bin/loguard-spool-worker' \) -print0 | xargs -0 -n1 php -l
       - run: php tests/Compatibility/CoreSmoke.php
+      - run: ./scripts/test-standalone.sh
 
   full:
     name: Full / PHP ${{ matrix.php }}
@@ -54,3 +55,4 @@ jobs:
       - run: composer test
       - run: composer phpstan
       - run: ./scripts/test-installed-bin.sh
+      - run: ./scripts/test-standalone.sh
