@@ -25,5 +25,15 @@
     }
   },
   "minimum-stability": "stable",
-  "prefer-stable": true
+  "prefer-stable": true,
+  "suggest": {
+    "laravel/framework": "Required only when using the LoGuard Laravel Runtime adapter."
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "LoGuard\\Runtime\\Laravel\\LoGuardRuntimeServiceProvider"
+      ]
+    }
+  }
 }
