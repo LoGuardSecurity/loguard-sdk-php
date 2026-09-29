@@ -61,7 +61,8 @@ final class LoGuardMiddleware
                 (array) ($settings['track_body_json_paths'] ?? []),
                 (array) ($settings['trusted_proxies'] ?? []),
                 (int) ($settings['max_body_bytes'] ?? FieldPolicy::DEFAULT_MAX_BODY_BYTES),
-                (int) ($settings['max_body_json_depth'] ?? FieldPolicy::DEFAULT_MAX_JSON_DEPTH)
+                (int) ($settings['max_body_json_depth'] ?? FieldPolicy::DEFAULT_MAX_JSON_DEPTH),
+                (bool) ($settings['security_capture'] ?? true)
             );
             $event = $this->events->create($context, $policy);
             if ($event === null) {

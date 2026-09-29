@@ -21,12 +21,15 @@ final class CapturePolicy
         public readonly array $bodyByRoute = [],
         public readonly array $trustedProxies = [],
         public readonly int $maxBodyBytes = FieldPolicy::DEFAULT_MAX_BODY_BYTES,
-        public readonly int $maxJsonDepth = FieldPolicy::DEFAULT_MAX_JSON_DEPTH
+        public readonly int $maxJsonDepth = FieldPolicy::DEFAULT_MAX_JSON_DEPTH,
+        public readonly bool $securityCapture = false
     ) {
     }
 
     public function tracks(int $status): bool
     {
-        return $this->trackAll || in_array($status, $this->statuses, true);
+        return $this->securityCapture
+            || $this->trackAll
+            || in_array($status, $this->statuses, true);
     }
 }

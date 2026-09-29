@@ -61,7 +61,16 @@ return [
     */
     'middleware' => [
 
-        // HTTP status codes that get reported as LoGuard events.
+        // Automatic security telemetry mode.
+        //
+        // Enabled by default: LoGuard observes all application requests
+        // needed for attack detection and automatically applies bounded,
+        // privacy-safe capture policies. Set LOGUARD_SECURITY_CAPTURE=false
+        // only to retain the legacy manual/status-filtered capture model.
+        'security_capture' => (bool) env('LOGUARD_SECURITY_CAPTURE', true),
+
+        // Legacy/manual HTTP status filter. Used when security_capture=false,
+        // or together with track_all_requests in legacy mode.
         'track_statuses' => [400, 401, 403, 404, 429, 500, 502, 503],
 
         // Explicit opt-in: report EVERY response, regardless of status

@@ -27,16 +27,35 @@ final class HttpEventFactory
             $meta['headers'] = $headers;
         }
 
-        if ($context->routeName !== null) {
+        if ($policy->securityCapture) {
+            $query = FieldPolicy::captureSecurityQuery($context->query);
+
+            if ($query !== []) {
+                $meta['query'] = $query;
+            }
+        } elseif ($context->routeName !== null) {
             $query = FieldPolicy::captureQuery(
                 $policy->queryByRoute[$context->routeName] ?? [],
                 $context->query
             );
+
             if ($query !== []) {
                 $meta['query'] = $query;
             }
+        }
 
+        if ($policy->securityCapture) {
+            $body = FieldPolicy::captureSecurityBody(
+                $context->rawBody,
+                $context->contentType,
+                $policy->maxBodyBytes,
+                $policy->maxJsonDepth
+            );
+
+            $meta = [...$meta, ...$body->toMeta()];
+        } elseif ($context->routeName !== null) {
             $paths = $policy->bodyByRoute[$context->routeName] ?? [];
+
             if ($paths !== []) {
                 $body = FieldPolicy::captureBody(
                     $paths,
@@ -45,6 +64,7 @@ final class HttpEventFactory
                     $policy->maxBodyBytes,
                     $policy->maxJsonDepth
                 );
+
                 $meta = [...$meta, ...$body->toMeta()];
             }
         }

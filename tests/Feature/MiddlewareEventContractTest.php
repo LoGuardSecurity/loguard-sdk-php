@@ -118,14 +118,39 @@ final class MiddlewareEventContractTest extends OrchestraTestCase
         $this->assertSame('http_request', $event['type']);
     }
 
-    public function testUntrackedStatusIsNotReportedByDefault(): void
+    public function testSecurityCaptureReportsSuccessfulRequestByDefault(): void
     {
         config(['loguard.middleware.track_statuses' => [401, 404]]);
         config(['loguard.middleware.track_all_requests' => false]);
+        config(['loguard.middleware.security_capture' => true]);
 
-        $this->get('/ok'); // 200, not in track_statuses, track_all_requests off
+        $this->get('/ok');
 
-        $this->assertNull($this->capturedPayload(), 'a 200 response must not be reported unless track_all_requests is enabled');
+        $payload = $this->capturedPayload();
+
+        $this->assertNotNull(
+            $payload,
+            'security capture must report successful requests so attack detection is not status-dependent'
+        );
+
+        $event = $payload['events'][0] ?? null;
+
+        $this->assertNotNull($event);
+        $this->assertSame(200, $event['status_code']);
+    }
+
+    public function testLegacyModeStillHonorsStatusFiltering(): void
+    {
+        config(['loguard.middleware.security_capture' => false]);
+        config(['loguard.middleware.track_statuses' => [401, 404]]);
+        config(['loguard.middleware.track_all_requests' => false]);
+
+        $this->get('/ok');
+
+        $this->assertNull(
+            $this->capturedPayload(),
+            'legacy mode must retain status-based filtering for backward compatibility'
+        );
     }
 
     public function testTrackAllRequestsOptInReportsEverythingRegardlessOfStatus(): void
@@ -170,15 +195,50 @@ final class MiddlewareEventContractTest extends OrchestraTestCase
         $this->assertArrayNotHasKey('password', $event['meta']['body'] ?? []);
     }
 
-    public function testBodyCaptureIsOffWhenNotConfiguredForThatRoute(): void
+    public function testSecurityCaptureAutomaticallyCapturesSafeBodyWithoutRouteAllowlist(): void
     {
+        config(['loguard.middleware.security_capture' => true]);
         config(['loguard.middleware.track_statuses' => [401]]);
-        config(['loguard.middleware.track_body_json_paths' => []]); // nothing configured
+        config(['loguard.middleware.track_body_json_paths' => []]);
 
-        $this->postJson('/login', ['email' => 'a@b.com', 'password' => 'hunter2']);
+        $this->postJson('/login', [
+            'email' => 'a@b.com',
+            'password' => 'hunter2',
+        ]);
 
-        $event = $this->capturedPayload()['events'][0] ?? null;
+        $payload = $this->capturedPayload();
+        $event = $payload['events'][0] ?? null;
+
         $this->assertNotNull($event);
-        $this->assertArrayNotHasKey('body', $event['meta'] ?? []);
+        $this->assertSame(
+            'a@b.com',
+            $event['meta']['body']['email'] ?? null
+        );
+        $this->assertArrayNotHasKey(
+            'password',
+            $event['meta']['body'] ?? []
+        );
     }
+
+    public function testLegacyModeKeepsBodyCaptureOffWithoutRouteAllowlist(): void
+    {
+        config(['loguard.middleware.security_capture' => false]);
+        config(['loguard.middleware.track_statuses' => [401]]);
+        config(['loguard.middleware.track_body_json_paths' => []]);
+
+        $this->postJson('/login', [
+            'email' => 'a@b.com',
+            'password' => 'hunter2',
+        ]);
+
+        $payload = $this->capturedPayload();
+        $event = $payload['events'][0] ?? null;
+
+        $this->assertNotNull($event);
+        $this->assertArrayNotHasKey(
+            'body',
+            $event['meta'] ?? []
+        );
+    }
+
 }

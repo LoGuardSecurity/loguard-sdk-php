@@ -29,6 +29,16 @@ final class FieldPolicy
     public const DEFAULT_MAX_JSON_DEPTH = 8;
 
     /**
+     * Automatic security capture limits.
+     *
+     * These limits protect the application process from attacker-controlled
+     * query strings while retaining enough payload for attack detection.
+     */
+    public const DEFAULT_MAX_QUERY_PARAMS = 64;
+    public const DEFAULT_MAX_QUERY_VALUE_BYTES = 4096;
+    public const DEFAULT_MAX_QUERY_DEPTH = 4;
+
+    /**
      * @param array<array-key, mixed> $allowedNames Exact query-parameter names to keep for this route.
      * @param array<string, mixed> $queryParams Already-parsed query parameters
      *        (e.g. Laravel's $request->query()) — this class does not parse
@@ -59,6 +69,239 @@ final class FieldPolicy
         }
 
         return $result;
+    }
+
+    /**
+     * Automatic security-oriented query capture.
+     *
+     * Unlike captureQuery(), this does not require a customer-maintained
+     * allowlist. Sensitive field names are still dropped recursively.
+     *
+     * Attacker-controlled values are bounded so telemetry collection cannot
+     * be used to create unbounded memory or ingest amplification.
+     *
+     * @param array<array-key, mixed> $queryParams
+     * @return array<string, mixed>
+     */
+    public static function captureSecurityQuery(
+        array $queryParams,
+        int $maxParams = self::DEFAULT_MAX_QUERY_PARAMS,
+        int $maxValueBytes = self::DEFAULT_MAX_QUERY_VALUE_BYTES,
+        int $maxDepth = self::DEFAULT_MAX_QUERY_DEPTH
+    ): array {
+        if ($queryParams === [] || $maxParams <= 0) {
+            return [];
+        }
+
+        $result = [];
+        $count = 0;
+
+        foreach ($queryParams as $name => $value) {
+            if ($count >= $maxParams) {
+                break;
+            }
+
+            if (!is_string($name) || $name === '') {
+                continue;
+            }
+
+            if (self::isForbiddenFieldName($name)) {
+                continue;
+            }
+
+            $count++;
+
+            $result[$name] = self::sanitizeSecurityValue(
+                $value,
+                0,
+                $maxDepth,
+                $maxValueBytes,
+                $count,
+                $maxParams
+            );
+        }
+
+        return $result;
+    }
+
+    private static function sanitizeSecurityValue(
+        mixed $value,
+        int $depth,
+        int $maxDepth,
+        int $maxValueBytes,
+        int &$count,
+        int $maxParams
+    ): mixed {
+        if ($depth >= $maxDepth) {
+            return '[depth-limited]';
+        }
+
+        if (is_array($value)) {
+            $out = [];
+
+            foreach ($value as $key => $nested) {
+                if ($count >= $maxParams) {
+                    break;
+                }
+
+                if (is_string($key) && self::isForbiddenFieldName($key)) {
+                    continue;
+                }
+
+                $count++;
+
+                $out[$key] = self::sanitizeSecurityValue(
+                    $nested,
+                    $depth + 1,
+                    $maxDepth,
+                    $maxValueBytes,
+                    $count,
+                    $maxParams
+                );
+            }
+
+            return $out;
+        }
+
+        if (is_string($value)) {
+            if ($maxValueBytes <= 0) {
+                return '';
+            }
+
+            return mb_strcut($value, 0, $maxValueBytes, 'UTF-8');
+        }
+
+        if (is_int($value) || is_float($value) || is_bool($value) || $value === null) {
+            return $value;
+        }
+
+        return mb_strcut((string) $value, 0, max(0, $maxValueBytes), 'UTF-8');
+    }
+
+    /**
+     * Automatic bounded request-body capture for security detection.
+     *
+     * Supported:
+     *   - application/json
+     *   - application/x-www-form-urlencoded
+     *
+     * Unsupported/binary/file bodies are never captured.
+     * Sensitive field names are stripped recursively.
+     */
+    public static function captureSecurityBody(
+        ?string $rawBody,
+        ?string $contentType,
+        int $maxBodyBytes = self::DEFAULT_MAX_BODY_BYTES,
+        int $maxJsonDepth = self::DEFAULT_MAX_JSON_DEPTH
+    ): FieldCaptureResult {
+        if ($rawBody === null || $rawBody === '') {
+            return FieldCaptureResult::empty();
+        }
+
+        $normalized = self::normalizeContentType($contentType);
+
+        $isJson = is_string($normalized)
+            && (
+                $normalized === 'application/json'
+                || str_ends_with($normalized, '+json')
+            );
+
+        if (
+            !$isJson
+            && $normalized !== 'application/x-www-form-urlencoded'
+        ) {
+            return new FieldCaptureResult(
+                unsupportedContentType: true
+            );
+        }
+
+        if ($maxBodyBytes <= 0 || strlen($rawBody) > $maxBodyBytes) {
+            return new FieldCaptureResult(
+                tooLarge: true
+            );
+        }
+
+        if ($isJson) {
+            $hardCeiling = max(64, $maxJsonDepth + 16);
+
+            try {
+                $decoded = json_decode(
+                    $rawBody,
+                    true,
+                    $hardCeiling,
+                    JSON_THROW_ON_ERROR
+                );
+            } catch (\JsonException $e) {
+                if (str_contains(
+                    mb_strtolower($e->getMessage()),
+                    'depth'
+                )) {
+                    return new FieldCaptureResult(
+                        depthExceeded: true
+                    );
+                }
+
+                return new FieldCaptureResult(
+                    parseError: true
+                );
+            }
+
+            if (!is_array($decoded)) {
+                return new FieldCaptureResult(
+                    parseError: true
+                );
+            }
+
+            if (self::depthOf($decoded) > $maxJsonDepth) {
+                return new FieldCaptureResult(
+                    depthExceeded: true
+                );
+            }
+
+            $count = 0;
+
+            $filtered = self::sanitizeSecurityValue(
+                $decoded,
+                0,
+                $maxJsonDepth,
+                self::DEFAULT_MAX_QUERY_VALUE_BYTES,
+                $count,
+                self::DEFAULT_MAX_QUERY_PARAMS
+            );
+
+            return new FieldCaptureResult(
+                fields: is_array($filtered) ? $filtered : []
+            );
+        }
+
+        // application/x-www-form-urlencoded
+        //
+        // Parse according to PHP's normal request semantics, then apply
+        // exactly the same recursive secret stripping and bounded-value
+        // policy used for automatic query capture.
+        $decoded = [];
+        parse_str($rawBody, $decoded);
+
+        if (self::depthOf($decoded) > $maxJsonDepth) {
+            return new FieldCaptureResult(
+                depthExceeded: true
+            );
+        }
+
+        $count = 0;
+
+        $filtered = self::sanitizeSecurityValue(
+            $decoded,
+            0,
+            $maxJsonDepth,
+            self::DEFAULT_MAX_QUERY_VALUE_BYTES,
+            $count,
+            self::DEFAULT_MAX_QUERY_PARAMS
+        );
+
+        return new FieldCaptureResult(
+            fields: is_array($filtered) ? $filtered : []
+        );
     }
 
     /**
