@@ -1,0 +1,29 @@
+{
+  "name": "loguard/php-sensor",
+  "description": "LoGuard lightweight security telemetry sensor for legacy PHP applications.",
+  "type": "library",
+  "license": "MIT",
+  "keywords": [
+    "loguard",
+    "security",
+    "telemetry",
+    "laravel",
+    "php"
+  ],
+  "require": {
+    "php": ">=7.4",
+    "ext-json": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "LoGuard\\Sensor\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "LoGuard\\Sensor\\Tests\\": "tests/"
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
