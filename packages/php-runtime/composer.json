@@ -12,7 +12,8 @@
   ],
   "require": {
     "php": ">=7.4",
-    "ext-json": "*"
+    "ext-json": "*",
+    "ext-curl": "*"
   },
   "autoload": {
     "psr-4": {
@@ -35,5 +36,8 @@
         "LoGuard\\Runtime\\Laravel\\LoGuardRuntimeServiceProvider"
       ]
     }
-  }
+  },
+  "bin": [
+    "bin/loguard-runtime-worker"
+  ]
 }

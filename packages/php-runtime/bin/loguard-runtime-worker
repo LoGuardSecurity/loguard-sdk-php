@@ -1,0 +1,139 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use LoGuard\Runtime\Delivery\CurlTransport;
+use LoGuard\Runtime\Delivery\DeliveryConfig;
+use LoGuard\Runtime\Dispatch\FileSpool;
+use LoGuard\Runtime\Dispatch\SpoolWorker;
+
+$autoloadCandidates = array();
+
+if (
+    isset($GLOBALS['_composer_autoload_path'])
+    && is_string($GLOBALS['_composer_autoload_path'])
+) {
+    $autoloadCandidates[] =
+        $GLOBALS['_composer_autoload_path'];
+}
+
+$autoloadCandidates[] =
+    dirname(__DIR__) . '/vendor/autoload.php';
+
+$autoloadCandidates[] =
+    dirname(__DIR__) . '/autoload.php';
+
+$autoload = null;
+
+foreach ($autoloadCandidates as $candidate) {
+    if (is_file($candidate)) {
+        $autoload = $candidate;
+        break;
+    }
+}
+
+if ($autoload === null) {
+    fwrite(
+        STDERR,
+        "LoGuard Runtime autoload file not found. "
+        . "Install the package with Composer.\n"
+    );
+
+    exit(2);
+}
+
+require $autoload;
+
+$apiKey =
+    (string) getenv('LOGUARD_API_KEY');
+
+$spoolPath =
+    (string) (
+        getenv('LOGUARD_SPOOL_PATH')
+        ?: '/var/spool/loguard'
+    );
+
+$baseUrl =
+    (string) (
+        getenv('LOGUARD_BASE_URL')
+        ?: DeliveryConfig::DEFAULT_BASE_URL
+    );
+
+$timeout =
+    (float) (
+        getenv('LOGUARD_TIMEOUT')
+        ?: DeliveryConfig::DEFAULT_TIMEOUT
+    );
+
+$retries =
+    (int) (
+        getenv('LOGUARD_RETRIES')
+        ?: DeliveryConfig::DEFAULT_RETRIES
+    );
+
+$batchSize =
+    (int) (
+        getenv('LOGUARD_BATCH_SIZE')
+        ?: 50
+    );
+
+$allowInsecure =
+    filter_var(
+        getenv('LOGUARD_ALLOW_INSECURE_TRANSPORT')
+            ?: 'false',
+        FILTER_VALIDATE_BOOLEAN
+    );
+
+try {
+    $config = new DeliveryConfig(
+        $apiKey,
+        $baseUrl,
+        $timeout,
+        $retries,
+        $allowInsecure
+    );
+
+    $transport =
+        new CurlTransport($config);
+
+    $spool =
+        new FileSpool($spoolPath);
+
+    $result = (
+        new SpoolWorker(
+            $transport,
+            $spool
+        )
+    )->runOnceResult($batchSize);
+
+    if ($result->processed > 0) {
+        $message =
+            'Accepted '
+            . $result->accepted
+            . ' LoGuard event(s).';
+
+        if ($result->dropped > 0) {
+            $message .=
+                ' '
+                . $result->dropped
+                . ' dropped by server policy.';
+        }
+
+        fwrite(
+            STDOUT,
+            $message . PHP_EOL
+        );
+    }
+
+    exit(0);
+} catch (Throwable $e) {
+    fwrite(
+        STDERR,
+        'LoGuard Runtime worker failed: '
+        . $e->getMessage()
+        . PHP_EOL
+    );
+
+    exit(1);
+}
