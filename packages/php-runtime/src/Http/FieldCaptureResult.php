@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LoGuard\Sensor\Http;
+namespace LoGuard\Runtime\Http;
 
 final class FieldCaptureResult
 {

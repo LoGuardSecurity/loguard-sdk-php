@@ -5,7 +5,7 @@ declare(strict_types=1);
 require __DIR__ . '/../../src/Http/FieldCaptureResult.php';
 require __DIR__ . '/../../src/Http/FieldPolicy.php';
 
-use LoGuard\Sensor\Http\FieldPolicy;
+use LoGuard\Runtime\Http\FieldPolicy;
 
 function check($condition, string $message): void
 {
@@ -255,4 +255,4 @@ check(
     'scalar JSON rejected'
 );
 
-echo 'PHP SENSOR FIELD POLICY CONTRACT: PASS' . PHP_EOL;
+echo 'PHP RUNTIME FIELD POLICY CONTRACT: PASS' . PHP_EOL;

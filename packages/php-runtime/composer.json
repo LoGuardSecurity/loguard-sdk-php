@@ -1,6 +1,6 @@
 {
-  "name": "loguard/php-sensor",
-  "description": "LoGuard lightweight security telemetry sensor for legacy PHP applications.",
+  "name": "loguard/php-runtime",
+  "description": "LoGuard application security telemetry runtime for PHP 7.4+.",
   "type": "library",
   "license": "MIT",
   "keywords": [
@@ -16,12 +16,12 @@
   },
   "autoload": {
     "psr-4": {
-      "LoGuard\\Sensor\\": "src/"
+      "LoGuard\\Runtime\\": "src/"
     }
   },
   "autoload-dev": {
     "psr-4": {
-      "LoGuard\\Sensor\\Tests\\": "tests/"
+      "LoGuard\\Runtime\\Tests\\": "tests/"
     }
   },
   "minimum-stability": "stable",
