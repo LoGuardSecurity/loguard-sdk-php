@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace LoGuard\Runtime\Laravel;
 
+use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Support\ServiceProvider;
 use LoGuard\Runtime\Dispatch\FileSpool;
 use LoGuard\Runtime\EventBuilder;
 use LoGuard\Runtime\Http\HttpEventFactory;
+use LoGuard\Runtime\Laravel\Http\Middleware\LoGuardMiddleware;
 
 final class LoGuardRuntimeServiceProvider extends ServiceProvider
 {
@@ -61,6 +63,27 @@ final class LoGuardRuntimeServiceProvider extends ServiceProvider
 
     public function boot()
     {
+        $kernel = $this->app->make(
+            HttpKernel::class
+        );
+
+        $alreadyRegistered = false;
+
+        if (method_exists($kernel, 'hasMiddleware')) {
+            $alreadyRegistered = $kernel->hasMiddleware(
+                LoGuardMiddleware::class
+            );
+        }
+
+        if (
+            !$alreadyRegistered
+            && method_exists($kernel, 'pushMiddleware')
+        ) {
+            $kernel->pushMiddleware(
+                LoGuardMiddleware::class
+            );
+        }
+
         $this->publishes(
             [
                 __DIR__

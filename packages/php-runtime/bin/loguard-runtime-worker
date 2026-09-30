@@ -45,43 +45,136 @@ if ($autoload === null) {
 
 require $autoload;
 
+/**
+ * Read an environment value without assuming putenv() is enabled.
+ *
+ * @return string|null
+ */
+function loguardRuntimeEnv(string $name): ?string
+{
+    $value = getenv($name);
+
+    if ($value !== false && $value !== '') {
+        return (string) $value;
+    }
+
+    if (
+        isset($_ENV[$name])
+        && (string) $_ENV[$name] !== ''
+    ) {
+        return (string) $_ENV[$name];
+    }
+
+    if (
+        isset($_SERVER[$name])
+        && (string) $_SERVER[$name] !== ''
+    ) {
+        return (string) $_SERVER[$name];
+    }
+
+    return null;
+}
+
+/**
+ * Load a Laravel-style .env when phpdotenv is already available.
+ */
+function loguardRuntimeLoadDotEnv(string $root): void
+{
+    if (
+        !is_file($root . '/.env')
+        || !class_exists(\Dotenv\Dotenv::class)
+    ) {
+        return;
+    }
+
+    try {
+        \Dotenv\Dotenv::createImmutable(
+            $root
+        )->safeLoad();
+    } catch (\Throwable $e) {
+        // Existing process environment still takes precedence.
+    }
+}
+
+/**
+ * Resolve the default spool without requiring Laravel to boot.
+ */
+function loguardRuntimeDefaultSpool(
+    string $root
+): string {
+    if (
+        is_file($root . '/artisan')
+        && is_dir($root . '/storage')
+    ) {
+        return $root
+            . '/storage/loguard-spool';
+    }
+
+    return '/var/spool/loguard';
+}
+
+$root = getcwd();
+
+if ($root === false || $root === '') {
+    $root = '.';
+}
+
+loguardRuntimeLoadDotEnv($root);
+
 $apiKey =
-    (string) getenv('LOGUARD_API_KEY');
+    (string) (
+        loguardRuntimeEnv(
+            'LOGUARD_API_KEY'
+        ) ?: ''
+    );
 
 $spoolPath =
     (string) (
-        getenv('LOGUARD_SPOOL_PATH')
-        ?: '/var/spool/loguard'
+        loguardRuntimeEnv(
+            'LOGUARD_SPOOL_PATH'
+        )
+        ?: loguardRuntimeDefaultSpool(
+            $root
+        )
     );
 
 $baseUrl =
     (string) (
-        getenv('LOGUARD_BASE_URL')
+        loguardRuntimeEnv(
+            'LOGUARD_BASE_URL'
+        )
         ?: DeliveryConfig::DEFAULT_BASE_URL
     );
 
 $timeout =
     (float) (
-        getenv('LOGUARD_TIMEOUT')
+        loguardRuntimeEnv(
+            'LOGUARD_TIMEOUT'
+        )
         ?: DeliveryConfig::DEFAULT_TIMEOUT
     );
 
 $retries =
     (int) (
-        getenv('LOGUARD_RETRIES')
+        loguardRuntimeEnv(
+            'LOGUARD_RETRIES'
+        )
         ?: DeliveryConfig::DEFAULT_RETRIES
     );
 
 $batchSize =
     (int) (
-        getenv('LOGUARD_BATCH_SIZE')
+        loguardRuntimeEnv(
+            'LOGUARD_BATCH_SIZE'
+        )
         ?: 50
     );
 
 $allowInsecure =
     filter_var(
-        getenv('LOGUARD_ALLOW_INSECURE_TRANSPORT')
-            ?: 'false',
+        loguardRuntimeEnv(
+            'LOGUARD_ALLOW_INSECURE_TRANSPORT'
+        ) ?: 'false',
         FILTER_VALIDATE_BOOLEAN
     );
 
@@ -127,7 +220,7 @@ try {
     }
 
     exit(0);
-} catch (Throwable $e) {
+} catch (\Throwable $e) {
     fwrite(
         STDERR,
         'LoGuard Runtime worker failed: '
