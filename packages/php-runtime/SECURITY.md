@@ -25,7 +25,7 @@ When reporting a security problem, include enough information to reproduce and u
 
 Do not include production API keys, passwords, session values, private keys, customer data or other secrets.
 
-A private security contact will be documented with the public repository before the first release.
+Use the private vulnerability-reporting channel published with the official LoGuard repository. Do not include secrets or customer data in reports.
 
 ## Security model
 
