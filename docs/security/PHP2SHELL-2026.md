@@ -38,3 +38,20 @@ version below the configured threshold. Unknown and unsupported statuses do not 
 Cloudflare WAF can provide defense in depth but does not replace interpreter patching.
 The LoGuard SDK cannot remediate interpreter vulnerabilities, and this tool performs no
 network requests, telemetry, runtime blocking, or automatic updates.
+
+
+## Verified security references
+
+The CVE identifiers and upstream fixed-version thresholds were
+cross-checked against the following October 21, 2026 publications:
+
+- PHP 8.5.12 official release announcement:
+  https://news-web.php.net/php.announce/513
+- Canadian Centre for Cyber Security:
+  https://www.cyber.gc.ca/en/alerts-advisories/al26-026-critical-vulnerabilities-impacting-php-cve-2026-109618-cve-2026-109619
+- PHP upstream advisory:
+  https://github.com/php/php-src/security/advisories/GHSA-6wmf-4rv5-p3rp
+
+PHP 8.1 and older branches may also be affected despite being
+classified as UNSUPPORTED by this diagnostic. Upgrade or obtain
+a vendor-confirmed security backport.
