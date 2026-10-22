@@ -255,4 +255,62 @@ check(
     'scalar JSON rejected'
 );
 
+/* Form-typed JSON regression: malformed payloads are not persisted. */
+foreach (array(
+    '{"password":"secret", "q":',
+    '[{"token":"secret"}',
+) as $raw) {
+    $body = FieldPolicy::captureSecurityBody(
+        $raw,
+        'application/x-www-form-urlencoded'
+    );
+
+    check(
+        $body->parseError === true
+        && $body->fields === array()
+        && !isset($body->toMeta()['body']),
+        'form-typed malformed JSON rejected'
+    );
+}
+
+/* Form-typed valid JSON uses normal JSON redaction. */
+$body = FieldPolicy::captureSecurityBody(
+    '{"method":"eth_getWork","password":"secret"}',
+    'application/x-www-form-urlencoded'
+);
+
+check(
+    isset($body->fields['method'])
+    && !isset($body->fields['password'])
+    && $body->parseError === false,
+    'form-typed valid JSON sanitized'
+);
+
+/* Ordinary form remains form-urlencoded. */
+$body = FieldPolicy::captureSecurityBody(
+    'a=1&b=two',
+    'application/x-www-form-urlencoded'
+);
+
+check(
+    isset($body->fields['a'])
+    && isset($body->fields['b'])
+    && $body->parseError === false,
+    'ordinary form preserved'
+);
+
+/* Size rejection occurs before JSON sniffing. */
+$body = FieldPolicy::captureSecurityBody(
+    '{"password":"secret","method":"test"}',
+    'application/x-www-form-urlencoded',
+    8
+);
+
+check(
+    $body->tooLarge === true
+    && $body->fields === array()
+    && $body->parseError === false,
+    'oversized form-typed JSON rejected'
+);
+
 echo 'PHP RUNTIME FIELD POLICY CONTRACT: PASS' . PHP_EOL;

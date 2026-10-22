@@ -50,6 +50,7 @@ install_root="$temporary/$package"
 
 for required in \
     autoload.php \
+    bootstrap.php \
     src/Client.php \
     src/Config.php \
     src/CodeIgniter3/LoGuardHook.php \
