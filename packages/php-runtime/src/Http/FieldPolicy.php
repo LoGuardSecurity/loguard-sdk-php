@@ -113,6 +113,35 @@ final class FieldPolicy
             );
         }
 
+        // [form-json-sniff] Bots often send a JSON body under the default form
+        // content type. parse_str() would fold the whole body into one mangled
+        // key, so sniff real JSON and decode it as JSON instead.
+        if (
+            !$isJson
+            && preg_match('/^\s*[\[{]/', $rawBody) === 1
+        ) {
+            try {
+                $sniffed = json_decode(
+                    $rawBody,
+                    true,
+                    max(64, $maxJsonDepth + 16),
+                    JSON_THROW_ON_ERROR
+                );
+
+                if (is_array($sniffed)) {
+                    $isJson = true;
+                }
+            } catch (\JsonException $e) {
+                return new FieldCaptureResult(
+                    array(),
+                    true,
+                    false,
+                    false,
+                    false
+                );
+            }
+        }
+
         if ($isJson) {
             $hardCeiling = max(64, $maxJsonDepth + 16);
 

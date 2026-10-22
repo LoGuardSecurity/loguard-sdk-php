@@ -1,0 +1,81 @@
+name: PHP Runtime Compatibility
+
+on:
+  push:
+    paths:
+      - 'packages/php-runtime/**'
+      - 'src/Signing.php'
+      - '.github/workflows/runtime-compatibility.yml'
+  pull_request:
+    paths:
+      - 'packages/php-runtime/**'
+      - 'src/Signing.php'
+      - '.github/workflows/runtime-compatibility.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-compatibility:
+    name: Runtime / PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.4', '8.0', '8.1', '8.2', '8.3', '8.4', '8.5']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, json
+          coverage: none
+          tools: none
+
+      - name: Validate PHP version
+        run: |
+          php -v
+          php -r '
+            if (version_compare(PHP_VERSION, "7.4", "<")) {
+                exit(1);
+            }
+          '
+
+      - name: PHP syntax check
+        shell: bash
+        run: |
+          set -euo pipefail
+          find packages/php-runtime/src \
+               packages/php-runtime/config \
+               packages/php-runtime/tests \
+               -type f -name '*.php' -print0 \
+            | xargs -0 -r -n1 php -l
+
+          php -l src/Signing.php
+          php -l packages/php-runtime/bin/loguard-runtime-worker
+
+      - name: Runtime contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for test in \
+            packages/php-runtime/tests/Unit/field_policy_contract.php \
+            packages/php-runtime/tests/Unit/http_event_contract.php \
+            packages/php-runtime/tests/Unit/event_builder_contract.php \
+            packages/php-runtime/tests/Unit/file_spool_contract.php \
+            packages/php-runtime/tests/Unit/delivery_contract.php \
+            packages/php-runtime/tests/Unit/signing_parity_monorepo.php
+          do
+            echo "=== $test ==="
+            php "$test"
+          done
+
+      - name: Runtime compatibility verified
+        run: echo "PHP_RUNTIME_COMPATIBILITY_PASS"

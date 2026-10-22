@@ -41,6 +41,7 @@ mkdir -p "$dist"
 
 cp -R "$root/src" "$stage/src"
 cp "$root/standalone/autoload.php" "$stage/autoload.php"
+cp "$root/standalone/bootstrap.php" "$stage/bootstrap.php"
 cp "$root/bin/loguard-spool-worker" "$stage/bin/loguard-spool-worker"
 cp "$root/LICENSE" "$stage/LICENSE"
 cp "$root/docs/STANDALONE.md" "$stage/README.md"
