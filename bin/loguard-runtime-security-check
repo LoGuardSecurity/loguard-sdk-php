@@ -1,0 +1,41 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+require_once dirname(__DIR__) . '/src/Security/RuntimeSecurityPolicy.php';
+
+use LoGuard\Sdk\Security\RuntimeSecurityPolicy;
+
+$version = PHP_VERSION;
+$json = false;
+$strict = false;
+$vendorBuild = false;
+
+foreach (array_slice($argv, 1) as $arg) {
+    if ($arg === '--help') {
+        echo "Usage: php bin/loguard-runtime-security-check [--version=X.Y.Z] [--format=json] [--vendor-build] [--strict]\n";
+        exit(0);
+    }
+    if (strpos($arg, '--version=') === 0) {
+        $version = substr($arg, 10);
+    } elseif ($arg === '--format=json') {
+        $json = true;
+    } elseif ($arg === '--vendor-build') {
+        $vendorBuild = true;
+    } elseif ($arg === '--strict') {
+        $strict = true;
+    } else {
+        fwrite(STDERR, "Unknown option: {$arg}\n");
+        exit(2);
+    }
+}
+
+$result = RuntimeSecurityPolicy::assess($version, $vendorBuild);
+if ($json) {
+    echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL;
+} else {
+    echo "PHP: {$result['installed_version']}\nStatus: {$result['status']}\n";
+    echo "Evidence: {$result['evidence_source']}\nAction: {$result['recommended_action']}\n";
+}
+exit($strict && $result['status'] === 'VULNERABLE' ? 1 : 0);
