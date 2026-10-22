@@ -35,7 +35,8 @@
         }
     },
     "bin": [
-        "bin/loguard-spool-worker"
+        "bin/loguard-spool-worker",
+        "bin/loguard-runtime-security-check"
     ],
     "extra": {
         "laravel": {
