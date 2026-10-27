@@ -27,6 +27,10 @@ final class FileSpool
      */
     public function enqueue(array $event): bool
     {
+        if (isset($event['type']) && is_string($event['type'])
+            && in_array(strtolower(trim($event['type'])), array('ai_llm_request', 'ai_llm_response', 'ai_tool_call'), true)) {
+            return false;
+        }
         try {
             $this->ensureDirectory();
 

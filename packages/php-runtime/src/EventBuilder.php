@@ -71,6 +71,9 @@ final class EventBuilder
                 ? $event['meta']
                 : array();
 
+            if (in_array(strtolower(trim($type)), array('ai_llm_request', 'ai_llm_response', 'ai_tool_call'), true)) {
+                $meta = \LoGuard\Runtime\Ai\ContentPolicy::clean($type, $meta);
+            }
             $meta['env'] = $this->env;
 
             $service = array_key_exists('service', $event)

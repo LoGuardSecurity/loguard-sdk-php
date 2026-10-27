@@ -168,6 +168,10 @@ final class Client
         array $meta = [],
         ?DateTimeInterface $ts = null
     ): void {
+        // External event sinks may persist content. AI must use event()/eventBatch().
+        if (\LoGuard\Sdk\Ai\ContentPolicy::isAi($type)) {
+            return;
+        }
         try {
             $event = $this->buildEvent($type, $ip, $path, $statusCode, $userId, $service, $meta, $ts);
         } catch (Throwable) {
@@ -311,7 +315,13 @@ final class Client
             $p = substr($p, 0, 1024);
         }
 
-        $m = $this->sanitizer->meta($meta);
+        try {
+            $m = \LoGuard\Sdk\Ai\ContentPolicy::isAi($type)
+                ? \LoGuard\Sdk\Ai\ContentPolicy::clean($type, $meta)
+                : $this->sanitizer->meta($meta);
+        } catch (\InvalidArgumentException $e) {
+            throw new LoGuardValidationException('Invalid or oversized AI metadata');
+        }
         $m['env'] = $this->config->env;
 
         $svc = $service ?? $this->config->service;
