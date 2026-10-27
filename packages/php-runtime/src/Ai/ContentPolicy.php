@@ -14,6 +14,10 @@ final class ContentPolicy
         ), true);
     }
 
+    /**
+     * @param array<string, mixed> $meta
+     * @return array<string, mixed>
+     */
     public static function clean(string $type, array $meta): array
     {
         $type = strtolower(trim($type));
@@ -73,17 +77,20 @@ final class ContentPolicy
         return $out;
     }
 
+    /** @param array<array-key, mixed> $value */
     private static function isList(array $value): bool
     {
         return $value === array() || array_keys($value) === range(0, count($value) - 1);
     }
 
+    /** @param mixed $value */
     private static function text($value, int $limit): void
     {
         // Byte limits are conservative for UTF-8; never split or truncate content.
         if (!is_string($value) || strlen($value) > $limit || preg_match('//u', $value) !== 1) { self::fail(); }
     }
 
+    /** @param mixed $value */
     private static function structured($value, int $depth): void
     {
         if ($depth > 6) { self::fail(); }
@@ -99,12 +106,14 @@ final class ContentPolicy
         }
     }
 
+    /** @param mixed $value */
     private static function encode($value): string
     {
         try { return json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR); }
         catch (\Throwable $e) { self::fail(); }
     }
 
+    /** @return never */
     private static function fail(): void
     {
         throw new \InvalidArgumentException('Invalid or oversized AI metadata');
