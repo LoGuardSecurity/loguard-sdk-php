@@ -18,6 +18,9 @@ final class FileSpool implements EventSinkInterface
 
     public function enqueue(Event $event): bool
     {
+        if (\LoGuard\Sdk\Ai\ContentPolicy::isAi($event->type)) {
+            return false;
+        }
         try {
             $this->ensureDirectory();
             if (count(glob($this->directory . '/*.json') ?: []) >= $this->maxFiles) {

@@ -47,6 +47,12 @@ final class SendLoGuardEvents implements ShouldQueue
      */
     public function __construct(array $events)
     {
+        foreach ($events as $event) {
+            if (is_array($event) && isset($event['type']) && is_string($event['type'])
+                && \LoGuard\Sdk\Ai\ContentPolicy::isAi($event['type'])) {
+                throw new \InvalidArgumentException('AI content cannot use persistent queue delivery');
+            }
+        }
         $this->events = $events;
     }
 

@@ -77,7 +77,7 @@ final class Transport
 
                 $lastException = new LoGuardConnectionException("Server error {$status}");
             } catch (TransportIoException $e) {
-                $lastException = new LoGuardConnectionException('Connection error: ' . $e->getMessage());
+                $lastException = new LoGuardConnectionException('Connection error');
             }
 
             if ($attempt < $retries) {
@@ -112,7 +112,7 @@ final class Transport
 
                 $lastException = new LoGuardConnectionException("Server error {$status}");
             } catch (TransportIoException $e) {
-                $lastException = new LoGuardConnectionException('Connection error: ' . $e->getMessage());
+                $lastException = new LoGuardConnectionException('Connection error');
             }
 
             if ($attempt < $retries) {
@@ -222,35 +222,30 @@ final class Transport
             if ($detail === 'subscription_expired') {
                 throw new LoGuardAuthException('Subscription expired — renew at loguard.org');
             }
-            throw new LoGuardAuthException('Access denied: ' . (is_string($detail) ? $detail : json_encode($detail)));
+            throw new LoGuardAuthException('Access denied');
         }
         if ($status === 404) {
-            throw new LoGuardNotFoundException('Not found: ' . ($d['detail'] ?? $snippet));
+            throw new LoGuardNotFoundException('Not found');
         }
         if ($status === 409) {
-            throw new LoGuardConflictException('Conflict: ' . ($d['detail'] ?? $snippet));
+            throw new LoGuardConflictException('Conflict');
         }
         if ($status === 422) {
-            throw new LoGuardValidationException('Validation error: ' . $snippet);
+            throw new LoGuardValidationException('Validation error');
         }
         if ($status === 429) {
             $detail = $d['detail'] ?? [];
             if (is_array($detail) && ($detail['err'] ?? null) === 'usage_limit_exceeded') {
-                throw new LoGuardQuotaException(sprintf(
-                    "Monthly quota exceeded: %s/%s events on plan '%s'. Upgrade at loguard.org",
-                    $detail['used'] ?? '?',
-                    $detail['limit'] ?? '?',
-                    $detail['plan'] ?? '?'
-                ));
+                throw new LoGuardQuotaException('Monthly quota exceeded');
             }
-            throw new LoGuardConnectionException('Rate limited: ' . $snippet);
+            throw new LoGuardConnectionException('Rate limited');
         }
         if ($status >= 500) {
-            throw new LoGuardConnectionException("Server error ({$status}): {$snippet}");
+            throw new LoGuardConnectionException("Server error ({$status})");
         }
 
         if ($status < 200 || $status >= 300) {
-            throw new LoGuardConnectionException("Unexpected HTTP status ({$status}): {$snippet}");
+            throw new LoGuardConnectionException("Unexpected HTTP status ({$status})");
         }
 
         if (!is_array($decoded)) {
